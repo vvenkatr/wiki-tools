@@ -31,11 +31,11 @@ public class WikiRevToolsDiffTest {
     bw.close();
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiRevTools.diff(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
     assertEquals(2, hshResults.size());
     
     // setting the flag to false will include unchanged entries
-    hshResults = WikiRevTools.diff(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(0, hshResults.size());
     // WikiRevTools.diffToFile(tmpSrcDump, tmpTargetDump, opFile);
     // WikiRevTools.diffToFile(tmpSrcDump, tmpTargetDump, opFile, opFormat);
@@ -79,11 +79,11 @@ public class WikiRevToolsDiffTest {
     bw.close();
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiRevTools.diff(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
     assertEquals(2, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiRevTools.diff(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(1, hshResults.size());
     assertEquals(true, hshResults.containsKey("Test2"));
     assertEquals("NEW_Test2", hshResults.get("Test2"));
@@ -135,7 +135,7 @@ public class WikiRevToolsDiffTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiRevTools.diff(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
     assertEquals(3, hshResults.size());
     assertEquals("Test3", hshResults.get("Test1"));    
   }
@@ -225,7 +225,7 @@ public class WikiRevToolsDiffTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiRevTools.diff(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
     assertEquals(6, hshResults.size());
     
     // 1 -> 3 -> 4 -> 5 -> 6
