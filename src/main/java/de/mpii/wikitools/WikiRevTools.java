@@ -80,6 +80,10 @@ public class WikiRevTools {
      *  - Ignore revision tag and all its children (including <id>, text)
      *  - Load Id,Title under Page tag
      */
+
+    // variables for tracking processed page
+    int processedPages = 0;
+    long start = System.currentTimeMillis();
     logger_.info("Scanning Target for Page Id, Title info...");
     while (targetReader.hasNext()) {
       event = targetReader.nextEvent();
@@ -106,22 +110,29 @@ public class WikiRevTools {
           // once we reach end of page, we can update the id and title retrieved for the page in map
           idTitleMap.put(pageId, title);
           titleIdMap.put(title, pageId);
+
           // reset for new page
           pageId = -1;
           title = null;
+          processedPages++;
+          if(processedPages % 100000 == 0) {
+            logger_.debug("Processed " + processedPages + " page entries.");
+          }
         }else if(strEndElement.equals(PAGE_REVISION_TAG)) {
           processingRevisionTag = false;
         }
       }
     }
+    logger_.info("Time to scan target (1st scan) : " + (System.currentTimeMillis() - start) / 1000 + " s.");
+    processedPages = 0;
 
-    logger_.info("Scanning Target Dump for REDIRECTS...");
     // iterate over target again and resolve REDIRECTS ( and DISAMBIGUATION )
     targetReader = factory.createXMLEventReader(new FileReader(target));
     boolean extractRedirectText = false;
     Matcher redirectMatcher;
     int redirectId = -1;
     String redirectTitle = null;
+    start = System.currentTimeMillis();
     while (targetReader.hasNext()) {
       event = targetReader.nextEvent();
       if (event.isStartElement()) {
@@ -160,15 +171,21 @@ public class WikiRevTools {
           // reset for new page
           pageId = -1;
           title = null;
+          processedPages++;
+          if(processedPages % 100000 == 0) {
+            logger_.debug("Processed " + processedPages + " page entries.");
+          }
         }else if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
           processingRevisionTag = false;
         }
       }
     }
 
-    logger_.info("Scanning source dump...");
+    logger_.info("Time to scan target (2nd Scan - Redirects,Disambiguations) : " + (System.currentTimeMillis() - start) / 1000 + " s.");
     // finally iterate over source dump file and construct the final change map
+    processedPages = 0;
     Map<String, String> finalMap = new HashMap<String, String>();
+    start = System.currentTimeMillis();
     while(sourceReader.hasNext()) {
       event = sourceReader.nextEvent();
       if (event.isStartElement()) {
@@ -207,9 +224,14 @@ public class WikiRevTools {
           // reset for new page
           pageId = -1;
           title = null;
+          processedPages++;
+          if(processedPages % 100000 == 0) {
+            logger_.debug("Processed " + processedPages + " page entries.");
+          }
         }
       }
     }
+    logger_.info("Time to scan source dump : " + ((System.currentTimeMillis() - start) / 1000) + " s.");
     return finalMap;
   }
 
