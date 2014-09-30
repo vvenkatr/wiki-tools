@@ -12,8 +12,12 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,6 +70,26 @@ public class WikiRevTools {
   // map to store final-map-results
   private static Map<String, String> finalMap;
 
+  // map to store title and a portion of original text entry from new(target) dump(needed only for writing to file)
+  private static Map<String, String> newDumpPageText;
+
+  //map to store title and a portion of original text entry from old(source) dump(needed only for writing to file)
+  private static Map<String, String> oldDumpPageText;
+
+  // set to store redirected titles for verification before writing to file
+  private static Set<String> redirectedTitles;
+
+  // set to store disambiguated titles for verification before writing to file
+  private static Set<String> disambiguatedTitles;
+
+  /* The following two maps combined together store title -> list of titles of all page entries
+   * A map to store any disambiguation entry along with all provided links.
+   * A map to store all the links in the current non-disambiguation page. (To resolve disambiguation)
+   */
+  private static Map<String, List<String>> disambiguationPageLinks;
+
+  private static Map<String, List<String>> pageContent;
+
   private static Options commandLineOptions;
 
   private static Logger logger_ = LoggerFactory.getLogger(WikiRevTools.class);
@@ -73,6 +97,19 @@ public class WikiRevTools {
   private enum DumpType {
     OLD, NEW;
   }
+
+  private static final String[] DISAMBIGUATION_TERMS = new String[] {"{{Disambig}}","{{Airport_disambig}}",
+    "{{Battledist}}","{{Callsigndis}}","{{Chemistry disambiguation}}",
+    "{{Church_disambig}}","{{Disambig-Chinese-char-title}}",
+    "{{Disambig-cleanup}}","{{Genus_disambiguation}}",
+    "{{Geodis}}","{{Hndis}}","{{Hndis-cleanup}}","{{Hospitaldis}}",
+    "{{Hurricane_disambig}}","{{Letter_disambig}}",
+    "{{Letter-NumberCombDisambig}}","{{Mathdab}}","{{MolFormDisambig}}",
+    "{{NA_Broadcast_List}}","{{Numberdis}}","{{Schooldis}}",
+    "{{Species_Latin name abbreviation disambiguation}}",
+    "{{Taxonomy_disambiguation}}","{{Species_Latin_name_disambiguation}}",
+    "{{WP_disambig}}"
+  };
 
   private enum TargetAction {
     LOAD_PAGE_INFO, LOAD_REDIRECTS_DISAMBIGUATIONS;
@@ -111,10 +148,7 @@ public class WikiRevTools {
    */
 
   public static Map<String, String> map(File oldDump, File newDump, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
-    idTitleMap = new TIntObjectHashMap<String>();
-    titleIdMap = new TObjectIntHashMap<String>();
-    redirectIds = new TIntIntHashMap();
-    finalMap = new HashMap<String, String>();
+    init();
 
     XMLInputFactory factory = XMLInputFactory.newInstance();
     XMLEventReader newDumpReader = factory.createXMLEventReader(new FileReader(newDump));
@@ -125,7 +159,7 @@ public class WikiRevTools {
     processReader(newDumpReader, DumpType.NEW, TargetAction.LOAD_PAGE_INFO, includeUnchangedEntries);
     logger_.debug("Time to scan older version of dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
 
-    // reload and iterate once again over target and construct redirects.
+    // reload and iterate once again over target and construct redirects & disambiguation.
     start = System.currentTimeMillis();
     newDumpReader = factory.createXMLEventReader(new FileReader(newDump));
     processReader(newDumpReader, DumpType.NEW, TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS, includeUnchangedEntries);
@@ -137,6 +171,19 @@ public class WikiRevTools {
     processReader(oldDumpReader, DumpType.OLD, null, includeUnchangedEntries);
     logger_.debug("Time to scan new version of dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
     return finalMap;
+  }
+
+  private static void init() {
+    idTitleMap = new TIntObjectHashMap<String>();
+    titleIdMap = new TObjectIntHashMap<String>();
+    redirectIds = new TIntIntHashMap();
+    finalMap = new HashMap<String, String>();
+    disambiguationPageLinks = new HashMap<>();
+    pageContent = new HashMap<>();
+    redirectedTitles = new HashSet<>();
+    disambiguatedTitles = new HashSet<>();
+    newDumpPageText = new HashMap<>();
+    oldDumpPageText = new HashMap<>();
   }
 
   /**
@@ -196,7 +243,7 @@ public class WikiRevTools {
     String redirectTitle = null;
     boolean processingRevisionTag = false;
     boolean extractRedirectText = false;
-    Matcher redirectMatcher;
+    String revisionTextContent = null;
 
     boolean loadAdditionalInfo = dumpType.equals(DumpType.NEW)
         && actionType.equals(TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS);
@@ -220,13 +267,28 @@ public class WikiRevTools {
             extractRedirectText = true;
           }
         } else {
-          if(extractRedirectText && strStartElement.equals(PAGE_REVISION_TEXT_TAG)) {
-            // process revision tag only for redirection.
-            redirectMatcher = pattern.matcher(reader.getElementText());
-            while(redirectMatcher.find()) {
-              redirectTitle = redirectMatcher.group(1);
+          if(strStartElement.equals(PAGE_REVISION_TEXT_TAG)) {
+            // process revision tag for redirection and disambiguation.
+            revisionTextContent = reader.getElementText();
+            if(extractRedirectText) {
+              redirectTitle = extractRedirectTitle(revisionTextContent);
+              extractRedirectText = false;
+            } else if(loadAdditionalInfo) {
+              // ok. now, extract all links the text, to be used for disambiguation
+              // TODO: verify the possibility of having current title in some other page's disambiguation
+              // if so, need to store the current disambiguation title's content in page content.
+              logger_.debug("Processing : " + title + revisionTextContent);
+              List<String> lstLinks = extractLinks(revisionTextContent);
+              if(containsDisambiguation(revisionTextContent)) {
+                disambiguationPageLinks.put(title, lstLinks);
+                logger_.debug(disambiguationPageLinks.toString());
+              } else {
+                pageContent.put(title, lstLinks);
+                logger_.debug(pageContent.toString());
+              }
+              // store text entry of page
+              newDumpPageText.put(title, cleanupText(revisionTextContent));
             }
-            extractRedirectText = false;
           }
         }
       }
@@ -250,16 +312,32 @@ public class WikiRevTools {
             if(pageId != -1 && title != null) {
               // check whether this id is redirected to another element
               redirectId = resolveRedirection(redirectIds, pageId);
+              boolean redirected = (redirectId != pageId);
               String targetTitle = idTitleMap.get(redirectId);
-              // check whether the source dump's id is pointing to same title
+
+              boolean disambiguated = false;
+              if(!redirected && disambiguationPageLinks.containsKey(targetTitle)) {
+                targetTitle = disambiguate(targetTitle, revisionTextContent);
+                disambiguated = true;
+              }
+
+              oldDumpPageText.put(title, cleanupText(revisionTextContent));
+
               if(!title.equals(targetTitle) || includeUnchangedEntries) {
                 finalMap.put(title, targetTitle);
               }
+
+              // keep track of
+              if(redirected) {
+                redirectedTitles.add(title);
+              } else if(disambiguated) {
+                disambiguatedTitles.add(title);
+              }
+
               pageId = -1;
               title = null;
             }
           }
-
           // reset for new page
           pageId = -1;
           title = null;
@@ -267,11 +345,40 @@ public class WikiRevTools {
           if(processedPages % 100000 == 0) {
             logger_.debug("Processed " + processedPages + " page entries.");
           }
-        } else if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
+        }else if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
           processingRevisionTag = false;
         }
       }
     }
+  }
+
+  private static String disambiguate(String targetTitle, String revisionTextContent) {
+    logger_.debug("Disambiguating : " + targetTitle);
+    List<String> lstChoices = disambiguationPageLinks.get(targetTitle);
+    // for each disambiguation option, get the content stored in pageContent
+    // and compute similarity
+    double maxScore = 0.0;
+    String result = "";
+    for(String pageChoice : lstChoices) {
+      List<String> pageLinks = pageContent.get(pageChoice);
+      List<String> currentPageLinks = extractLinks(revisionTextContent);
+      double score = computeSimilarity(currentPageLinks, pageLinks);
+      logger_.debug("Score for " + pageChoice + " : " + score);
+      if(score > maxScore) {
+        result = pageChoice;
+        maxScore = score;
+      }
+    }
+    return result;
+  }
+
+  private static String cleanupText(String text) {
+    if(text == null) return text;
+    String tmpText = text.replaceAll("\n", " ");
+    tmpText = (tmpText != null) ? tmpText.replaceAll("\\s+", " ") : text.replaceAll("\\s+", " ");
+    tmpText = (tmpText != null) ? tmpText : text;
+    int maxLimit = (tmpText.length() < 1000) ? text.length() : 1000;
+    return text.substring(0, maxLimit);
   }
 
   //This method resolves redirection pages(including multiple redirections).
@@ -293,6 +400,51 @@ public class WikiRevTools {
     }
     if(found) return redirectId;
     return itK;
+  }
+
+  private static double computeSimilarity(List<String> list1, List<String> list2) {
+    Set<String> set1 = new HashSet<>(list1);
+    Set<String> set2 = new HashSet<>(list2);
+
+    int sizeCurrentSet = set1.size();
+    set1.retainAll(set2);
+    set2.removeAll(set1);
+
+    int union = sizeCurrentSet + set2.size();
+    int intersection = set1.size();
+    return ((double)intersection)/union;
+  }
+
+  private static String extractRedirectTitle(String content) {
+    List<String> lstLinks = extractLinks(content);
+    if(lstLinks.isEmpty())
+      return null;
+    // for redirect text, ideally there will be only one [[ ]] in the text.
+    logger_.debug("Extracted Redirection title : " + lstLinks);
+    return lstLinks.get(0);
+  }
+
+  private static List<String> extractLinks(String content) {
+    Matcher redirectMatcher = pattern.matcher(content);
+    List<String> lstLinks = new LinkedList<>();
+    while(redirectMatcher.find()) {
+      String tmp = redirectMatcher.group(1);
+      int idx = tmp.indexOf('|');
+      if(idx >= 0) {
+        tmp = tmp.substring(0, idx).trim();
+      }
+      // tmp = tmp.replaceAll(" ", "_");
+      lstLinks.add(tmp);
+    }
+    return lstLinks;
+  }
+
+  private static boolean containsDisambiguation(String content) {
+    for(String dTerm : DISAMBIGUATION_TERMS) {
+      if(content.contains(dTerm))
+        return true;
+    }
+    return false;
   }
 
   @SuppressWarnings("static-access")
@@ -345,7 +497,19 @@ public class WikiRevTools {
   private static void writeFileContent(File file, Map<String, String> hshResults) throws IOException {
     BufferedWriter writer = getBufferedWriter(file);
     for(Entry<String, String> e : hshResults.entrySet()) {
-      writer.append(e.getKey() + "\t" + e.getValue()+"\n");
+      String title = e.getKey();
+      String target = e.getValue();
+      writer.append(title + "\t" + target + "\t");
+      if(redirectedTitles.contains(title)) {
+        writer.append('R');
+      } else if(disambiguatedTitles.contains(title)){
+        writer.append('D');
+        // make sure to write src text and target text
+        writer.append('\t').append(oldDumpPageText.get(title)).append('\t').append(newDumpPageText.get(target));
+      } else {
+        writer.append('U');
+      }
+      writer.append("\n");
     }
     writer.flush();
     writer.close();
@@ -387,8 +551,20 @@ public class WikiRevTools {
           mapToFile(new File(oldDump), new File(newDump), new File(outputFile));
         } else {
           Map<String, String> hshResults = map(new File(oldDump), new File(newDump));
+          System.out.println(disambiguatedTitles);
           for(Entry<String, String> e : hshResults.entrySet()) {
-            System.out.println(e.getKey() + "\t" + e.getValue());
+            String title = e.getKey();
+            String target = e.getValue();
+            System.out.print(title + "\t" + target + "\t");
+            if(redirectedTitles.contains(title)) {
+              System.out.print('R');
+            } else if(disambiguatedTitles.contains(title)){
+              System.out.print("D\t"+oldDumpPageText.get(title)+"\t"+newDumpPageText.get(target));
+              // make sure to write src text and target text
+            } else {
+              System.out.print('U');
+            }
+            System.out.println();
           }
         }
         // done with the map

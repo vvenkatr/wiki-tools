@@ -6,6 +6,8 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Map;
 
 import javax.xml.stream.XMLStreamException;
@@ -330,4 +332,22 @@ public class WikiRevToolsDiffTest {
     assertEquals(true, !hshResults.get("Test1").equals("Test3"));
   }
 
+  @Test
+  public void testDisambiguationEntries() throws IOException, XMLStreamException, URISyntaxException {
+    // source dump
+    URL srcUrl = getClass().getResource("/Einstein_source.txt");
+    URL targetUrl = getClass().getResource("/Einstein_target.txt");
+
+    File tmpSrcDump = new File(srcUrl.toURI());
+    File tmpTargetDump = new File(targetUrl.toURI());
+
+    // default diff will also include all unchanged entries
+    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    assertEquals(4, hshResults.size());
+
+    // setting the flag to false will include unchanged entries
+    // hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
+    // assertEquals(1, hshResults.size());
+    assertEquals(hshResults.get("Einstein"), "Albert Einstein");
+  }
 }

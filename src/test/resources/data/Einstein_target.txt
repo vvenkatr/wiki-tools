@@ -1,0 +1,101 @@
+<wikimedia>
+<page>
+    <title>Einstein</title>
+    <ns>0</ns>
+    <id>12345</id>
+      <sha1></sha1>
+    <revision>
+      <id>479419610</id>
+      <timestamp>2012-02-29T04:44:51Z</timestamp>
+      <contributor>
+        <username>Macrakis</username>
+        <id>49920</id>
+      </contributor>
+      <comment>more disambiguation info</comment>
+      <text xml:space='preserve'>
+
+[[Albert Einstein]] was a German-American theoretical physicist.
+
+'''Einstein''' may refer to:
+
+* [[Einstein (crater)]], a large lunar crater along the Moons west limb
+* [[Einstein Observatory]], tje forst first fully imaging X-ray telescope put into orbit
+* [[Einstein Tower]], an astrophysical observatory in Potsdan, Germany
+
+__NOTOC__
+
+{{Disambig}} 
+      </text>
+    </revision>
+  </page>
+  <page>
+    <title>Albert Einstein</title>
+    <ns>0</ns>
+    <id>11111</id>
+      <sha1></sha1>
+    <revision>
+      <id>479419610</id>
+      <timestamp>2012-02-29T04:44:51Z</timestamp>
+      <contributor>
+        <username>Macrakis</username>
+        <id>49920</id>
+      </contributor>
+      <comment>more disambiguation info</comment>
+      <text xml:space='preserve'>
+	Albert Einstein was a German-American theoretical physicist. Einstein was born in [[Ulm|Ulm]], [[Germany|Germany]]. He developed [[general theory of relativity]]. He was awarded Nobel prize in Physics in 1921.
+      </text>
+    </revision>
+  </page>
+  <page>
+    <title>Einstein (crater)</title>
+    <ns>0</ns>
+    <id>22222</id>
+      <sha1></sha1>
+    <revision>
+      <id>479419610</id>
+      <timestamp>2012-02-29T04:44:51Z</timestamp>
+      <contributor>
+        <username>Macrakis</username>
+        <id>49920</id>
+      </contributor>
+      <comment>more disambiguation info</comment>
+      <text xml:space='preserve'>
+	Einstein is a large lunar crater that lies along the western limb of the [[Moon|Moon]], making it difficult to observe from the [[Earth | Planet Earth]]. The visibility of this formation is affected by libration effects, but even under the best conditions not much detail can be observed except from lunar orbit. Nearby craters of note include [[Moseley|Moseley]] just to the north, [[Dalton|Dalton]] along the eastern rim, [[Vasco da Gama|Vasco da Gama]] just to the southeast, and [[Bohr|Bohr]] to the south-southeast. The formation [[Vallis Bohr|vallis Bohr]] is visible to the south.
+      </text>
+    </revision>
+  </page>
+  <page>
+    <title>Einstein Observatory</title>
+    <ns>0</ns>
+    <id>33333</id>
+      <sha1></sha1>
+    <revision>
+      <id>479419610</id>
+      <timestamp>2012-02-29T04:44:51Z</timestamp>
+      <contributor>
+        <username>Macrakis</username>
+        <id>49920</id>
+      </contributor>
+      <text xml:space='preserve'>
+	Einstein Observatory (HEAO-2) was the first fully imaging [[X-ray telescope|X-ray telescope]] put into space and the second of [[NASA|NASA]]'s three High Energy Astrophysical Observatories. Named HEAO B before launch, the observatory's name was changed to honor Albert Einstein upon its successfully attaining orbit.The Einstein Observatory, HEAO-2, was launched on November 13, 1978, from [[Cape_Canaveral|Cape Canaveral]], [[Florida|Florida]], on an Atlas-Centaur SLV-3D booster rocket into a near-circular orbit with an initial altitude slightly above 500 km. Its orbital inclination orbit was 23.5 degrees. The Einstein Observatory satellite re-entered the Earth's atmosphere and burned up on March 25, 1982.
+      </text>
+    </revision>
+  </page>
+  <page>
+    <title>Einstein Tower</title>
+    <ns>0</ns>
+    <id>44444</id>
+      <sha1></sha1>
+    <revision>
+      <id>479419610</id>
+      <timestamp>2012-02-29T04:44:51Z</timestamp>
+      <contributor>
+        <username>Macrakis</username>
+        <id>49920</id>
+      </contributor>
+      <text xml:space='preserve'>
+	The Einstein Tower (German: Einsteinturm) is an astrophysical observatory in the Albert Einstein Science Park in [[Potsdam|Potsdam]], Germany built by [[Erich Mendelsohn]]. It was built on the summit of the Potsdam Telegraphenberg to house a solar telescope designed by the astronomer Erwin Finlay-Freundlich. The telescope supports experiments and observations to validate (or disprove) [[Albert_Einstein|Albert Einstein]]'s relativity theory. The building was first conceived around 1917, built from 1919 to 1921 after a fund-raising drive, and became operational in 1924. Although [[Albert_Einstein|Einstein]] never worked there, he supported the construction and operation of the telescope. It is still a working solar observatory today as part of the Leibniz Institute for Astrophysics Potsdam. Light from the telescope is directed down through the shaft to the basement where the instruments and laboratory are located. There were more than half a dozen telescopes in the laboratory.
+      </text>
+    </revision>
+  </page>
+</wikimedia>
