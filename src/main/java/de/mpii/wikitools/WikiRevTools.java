@@ -201,7 +201,7 @@ public class WikiRevTools {
       if(pageId != -1 && title != null) {
         // check whether this id is redirected to another element
         redirectId = pageId;
-        while(redirectIds.contains(redirectId)) {
+        while(redirectIds.containsKey(redirectId)) {
           redirectId = redirectIds.get(redirectId);
         }
         String targetTitle;
