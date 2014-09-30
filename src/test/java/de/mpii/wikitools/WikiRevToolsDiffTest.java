@@ -273,4 +273,62 @@ public class WikiRevToolsDiffTest {
 
     assertEquals("NEW_Test2", hshResults.get("Test2"));
   }
+
+  @Test
+  public void testRedirectionCycle() throws IOException, XMLStreamException {
+    System.out.println("Redirection Cycle");
+    // source dump
+    File tmpSrcDump = File.createTempFile("wiki-src-dump", "xml");
+    File tmpTargetDump = File.createTempFile("wiki-target-dump", "xml");
+
+    // base structure - "<mediawiki><page><title></title><id><id></page></mediawiki>"
+    BufferedWriter bw = new BufferedWriter(new FileWriter(tmpSrcDump));
+    bw.write("<mediawiki>"
+        + "<page>"
+        + "<title>Test1</title>"
+        + "<id>1</id>"
+        + "</page>"
+        + "<page>"
+        + "<title>Test2</title>"
+        + "<id>2</id>"
+        + "</page>"
+        + "<page>"
+        + "<title>Test3</title>"
+        + "<id>3</id>"
+        + "</page>"
+        + "</mediawiki>");
+    bw.close();
+
+    bw = new BufferedWriter(new FileWriter(tmpTargetDump));
+    bw.write("<mediawiki>"
+        + "<page>"
+        + "<title>Test1</title>"
+        + "<id>1</id>"
+        + "<redirect/>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">#REDIRECT [[Test3]] {{R from CamelCase}}</text>"
+        + "</revision>"
+        + "</page>"
+        + "<page>"
+        + "<title>NEW_Test2</title>"
+        + "<id>2</id>"
+        + "</page>"
+        + "<page>"
+        + "<title>Test3</title>"
+        + "<id>3</id>"
+        + "<redirect/>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">#REDIRECT [[Test1]] {{R from CamelCase}}</text>"
+        + "</revision>"
+        + "</page>"
+        + "</mediawiki>");
+    bw.close();
+    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    assertEquals(3, hshResults.size());
+    // Test1 REDIRECTS TO Test3, but since it forms a cycle, Test1 is mapped to itself
+    assertEquals(true, !hshResults.get("Test1").equals("Test3"));
+  }
+
 }

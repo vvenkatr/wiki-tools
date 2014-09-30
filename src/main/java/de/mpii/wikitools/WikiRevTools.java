@@ -3,6 +3,8 @@ package de.mpii.wikitools;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -200,16 +202,8 @@ public class WikiRevTools {
 
       if(pageId != -1 && title != null) {
         // check whether this id is redirected to another element
-        redirectId = pageId;
-        while(redirectIds.containsKey(redirectId)) {
-          redirectId = redirectIds.get(redirectId);
-        }
-        String targetTitle;
-        if(redirectId != pageId) {
-          targetTitle = idTitleMap.get(redirectId);
-        } else {
-          targetTitle = idTitleMap.get(pageId);
-        }
+        redirectId = resolveRedirection(redirectIds, pageId);
+        String targetTitle = idTitleMap.get(redirectId);
         // check whether the source dump's id is pointing to same title
         if(!title.equals(targetTitle) || includeUnchangedEntries) {
           finalMap.put(title, targetTitle);
@@ -233,6 +227,29 @@ public class WikiRevTools {
     }
     logger_.info("Time to scan source dump : " + ((System.currentTimeMillis() - start) / 1000) + " s.");
     return finalMap;
+  }
+
+  /*
+   * This method resolves redirection pages(including multiple redirections).
+   * In case of a cycle, the given id is returned i.e id is mapped on to itself.
+   */
+  private static int resolveRedirection(TIntIntHashMap redirectIds, int redirectId) {
+    TIntSet processed = new TIntHashSet();
+    processed.add(redirectId);
+    int itK = redirectId;
+    boolean found = false;
+    while(redirectIds.containsKey(itK)) {
+      itK = redirectIds.get(itK);
+      if(!processed.contains(itK)) {
+        processed.add(itK);
+      } else {
+        logger_.debug("Cycle Found for id : "+ redirectId +": " + processed);
+        found = true;
+        break;
+      }
+    }
+    if(found) return redirectId;
+    return itK;
   }
 
   public static void mapToFile(File source, File target, File output) throws IOException, XMLStreamException {
