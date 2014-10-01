@@ -35,124 +35,194 @@ import org.apache.commons.cli.PosixParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * This class consists of static methods that operate on either individual Wikipedia dump file or
+ * on multiple versions of dumps.
+ *
+ * @author vvenkatr
+ *
+ */
 public class WikiRevTools {
 
+  // Xml markups used in Wikipedia dump file.
+
   private static final String PAGE_TAG = "page";
-
   private static final String PAGE_ID_TAG = "id";
-
   private static final String PAGE_TITLE_TAG = "title";
-
   private static final String PAGE_REVISION_TAG = "revision";
-
   private static final String PAGE_REDIRECT_TAG = "redirect";
-
   private static final String PAGE_REVISION_TEXT_TAG = "text";
 
+  // Wikipedia page revision text will be matched against this pattern to retrieve name links.
   private static Pattern pattern = Pattern.compile("\\[\\[(.*?)\\]\\]");
+
+  //maps to store id, title relation
+  private static TIntObjectHashMap<String> idTitleMap;
+  private static TObjectIntHashMap<String> titleIdMap;
+
+  // map to store Redirections
+  private static TIntIntHashMap redirectIds;
+
+  // map to store final-map-results
+  private static Map<String, String> finalMap;
 
   private static Options commandLineOptions;
 
   private static Logger logger_ = LoggerFactory.getLogger(WikiRevTools.class);
 
-  public static Map<String, String> map(File source, File target) throws IOException, XMLStreamException {
-    return map(source, target, true);
+  private enum DumpType {
+    OLD, NEW;
   }
 
-  public static Map<String, String> map(File source, File target, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
-    // maps to store id, title relation
-    TIntObjectHashMap<String> idTitleMap = new TIntObjectHashMap<String>();
-    TObjectIntHashMap<String> titleIdMap = new TObjectIntHashMap<String>();
+  private enum TargetAction {
+    LOAD_PAGE_INFO, LOAD_REDIRECTS_DISAMBIGUATIONS;
+  }
 
-    // map to store Redirections
-    TIntIntHashMap redirectIds = new TIntIntHashMap();
+  /**
+   * Returns Map of Wiki page titles from old dump to new dump. The map also includes page entries that
+   * remain unchanged between the old and new dump. If any entry is deleted in the new dump, then the title
+   * from old dump will be mapped to null.
+   *
+   * In case of cyclic redirects, the old title will be mapped to itself.
+   *
+   * @param oldDump The old dump to verify.
+   * @param newDump The new dump to compare with.
+   * @return Map of old page titles to new page titles.
+   * @throws IOException  if loading of dumps fail.
+   * @throws XMLStreamException if dump xml is invalid.
+   */
+  public static Map<String, String> map(File oldDump, File newDump) throws IOException, XMLStreamException {
+    return map(oldDump, newDump, true);
+  }
 
-    // iterate over target and build id-title and title-id relations
+  /**
+   * Returns Map of Wiki page titles from old dump to new dump. If includeUnchangedEntries is false, unchanged
+   * entries will not be added to the final map returned. If any entry is deleted in the new dump, then the title
+   * from old dump will be mapped to null.
+   *
+   * In case of cyclic redirects, the old title will be mapped to itself.
+   *
+   * @param oldDump The old dump to verify.
+   * @param newDump The new dump to compare with.
+   * @param includeUnchangedEntries Flag to include/exclude unchanged entries.
+   * @return Map of old page titles to new page titles.
+   * @throws IOException  if loading of dumps fail.
+   * @throws XMLStreamException if dump xml is invalid.
+   */
+
+  public static Map<String, String> map(File oldDump, File newDump, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
+    idTitleMap = new TIntObjectHashMap<String>();
+    titleIdMap = new TObjectIntHashMap<String>();
+    redirectIds = new TIntIntHashMap();
+    finalMap = new HashMap<String, String>();
+
     XMLInputFactory factory = XMLInputFactory.newInstance();
-    XMLEventReader targetReader = factory.createXMLEventReader(new FileReader(target));
-    XMLEventReader sourceReader = factory.createXMLEventReader(new FileReader(source));
+    XMLEventReader newDumpReader = factory.createXMLEventReader(new FileReader(newDump));
+    XMLEventReader oldDumpReader = factory.createXMLEventReader(new FileReader(oldDump));
 
-    // variables to store page related information
-    int pageId = -1;
-    String title = null;
-    boolean processingRevisionTag = false;
-    XMLEvent event = null;
-    /*
-     * During the first pass over the target :
-     *  - Ignore revision tag and all its children (including <id>, text)
-     *  - Load Id,Title under Page tag
-     */
-
-    // variables for tracking processed page
-    int processedPages = 0;
     long start = System.currentTimeMillis();
-    logger_.info("Scanning Target for Page Id, Title info...");
-    while (targetReader.hasNext()) {
-      event = targetReader.nextEvent();
-      if(event.isStartDocument() || event.isEndDocument()) {
-        // do nothing
-      } else if (event.isStartElement()) {
+    // iterate over target and build id-title and title-id relations
+    processReader(newDumpReader, DumpType.NEW, TargetAction.LOAD_PAGE_INFO, includeUnchangedEntries);
+    logger_.debug("Time to scan older version of dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
+
+    // reload and iterate once again over target and construct redirects.
+    start = System.currentTimeMillis();
+    newDumpReader = factory.createXMLEventReader(new FileReader(newDump));
+    processReader(newDumpReader, DumpType.NEW, TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS, includeUnchangedEntries);
+    logger_.debug("Time to re-scan older version of dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
+
+    // finally, iterate over the source dump and build the output mapping.
+    // Passing *null* as it will not be considered at all for SOURCE
+    start = System.currentTimeMillis();
+    processReader(oldDumpReader, DumpType.OLD, null, includeUnchangedEntries);
+    logger_.debug("Time to scan new version of dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
+    return finalMap;
+  }
+
+  /**
+   * Writes the result of map method to file provided. The map also includes page entries that
+   * remain unchanged between the old and new dump. If any entry is deleted in the new dump, then the title
+   * from old dump will be mapped to null.
+   *
+   * In case of cyclic redirects, the old title will be mapped to itself.
+   *
+   * @param oldDump The old dump to verify.
+   * @param newDump The new dump to compare with.
+   * @param output  The path to write the final results.
+   * @throws IOException  if loading of dumps fail.
+   * @throws XMLStreamException if dump xml is invalid.
+   */
+  public static void mapToFile(File oldDump, File newDump, File output) throws IOException, XMLStreamException {
+    // by default, include the unchanged entries as well.
+    mapToFile(oldDump, newDump, output, true);
+  }
+
+  /**
+   * Writes the result of map method to file provided. If includeUnchangedEntries is false, unchanged
+   * entries will not be added to the final map returned. If any entry is deleted in the new dump, then the title
+   * from old dump will be mapped to null.
+   *
+   * In case of cyclic redirects, the old title will be mapped to itself.
+   *
+   * @param oldDump The old dump to verify.
+   * @param newDump The new dump to compare with.
+   * @param output  The path to write the final results.
+   * @throws IOException  if loading of dumps fail.
+   * @throws XMLStreamException if dump xml is invalid.
+   */
+  public static void mapToFile(File oldDump, File newDump, File output, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
+    Map<String, String> result = map(oldDump, newDump, includeUnchangedEntries);
+    logger_.debug("Writing results to file : " + output.getName());
+    try{
+      // just in case delete any old file
+      output.delete();
+      writeFileContent(output, result);
+      logger_.debug(result.size() + " entries written to " + output.getName());
+    }catch(IOException ioe) {
+      logger_.error("Failed to write results to file");
+    }
+  }
+
+  // private helper methods
+
+  private static void processReader(XMLEventReader reader,
+      DumpType dumpType, TargetAction actionType,
+      boolean includeUnchangedEntries) throws XMLStreamException {
+
+    int processedPages = 0;
+    int pageId = -1;
+    int redirectId = -1;
+    String title = null;
+    String redirectTitle = null;
+    boolean processingRevisionTag = false;
+    boolean extractRedirectText = false;
+    Matcher redirectMatcher;
+
+    boolean loadAdditionalInfo = dumpType.equals(DumpType.NEW)
+        && actionType.equals(TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS);
+
+    while (reader.hasNext()) {
+      XMLEvent event = reader.nextEvent();
+      if (event.isStartElement()) {
         StartElement startElement = event.asStartElement();
         String strStartElement = startElement.getName().getLocalPart();
+
         if(strStartElement.equals(PAGE_REVISION_TAG)) {
           processingRevisionTag = true;
         }
 
         if(!processingRevisionTag) {
           if(strStartElement.equals(PAGE_ID_TAG)) {
-            pageId = Integer.parseInt(targetReader.nextEvent().asCharacters().getData());
+            pageId = Integer.parseInt(reader.nextEvent().asCharacters().getData());
           } else if(strStartElement.equals(PAGE_TITLE_TAG)) {
-            title = targetReader.nextEvent().asCharacters().getData();
-          }
-        }
-      } else if(event.isEndElement()) {
-        EndElement endElement = event.asEndElement();
-        String strEndElement = endElement.getName().getLocalPart();
-        if (strEndElement.equals(PAGE_TAG)) {
-          // once we reach end of page, we can update the id and title retrieved for the page in map
-          idTitleMap.put(pageId, title);
-          titleIdMap.put(title, pageId);
-
-          // reset for new page
-          pageId = -1;
-          title = null;
-          processedPages++;
-          if(processedPages % 100000 == 0) {
-            logger_.debug("Processed " + processedPages + " page entries.");
-          }
-        }else if(strEndElement.equals(PAGE_REVISION_TAG)) {
-          processingRevisionTag = false;
-        }
-      }
-    }
-    logger_.info("Time to scan target (1st scan) : " + (System.currentTimeMillis() - start) / 1000 + " s.");
-    processedPages = 0;
-
-    // iterate over target again and resolve REDIRECTS ( and DISAMBIGUATION )
-    targetReader = factory.createXMLEventReader(new FileReader(target));
-    boolean extractRedirectText = false;
-    Matcher redirectMatcher;
-    int redirectId = -1;
-    String redirectTitle = null;
-    start = System.currentTimeMillis();
-    while (targetReader.hasNext()) {
-      event = targetReader.nextEvent();
-      if (event.isStartElement()) {
-        StartElement startElement = event.asStartElement();
-        String startElementName = startElement.getName().getLocalPart();
-
-        if(!processingRevisionTag) {
-          if(startElementName.equals(PAGE_ID_TAG)) {
-            pageId = Integer.parseInt(targetReader.nextEvent().asCharacters().getData());
-          } else if(startElementName.equals(PAGE_REDIRECT_TAG)) {
+            title = reader.nextEvent().asCharacters().getData();
+          } else if( loadAdditionalInfo  && strStartElement.equals(PAGE_REDIRECT_TAG)) {
             extractRedirectText = true;
-          } else if(startElementName.equals(PAGE_REVISION_TAG)) {
-            processingRevisionTag = true;
           }
         } else {
-          // within revision tag : look out for redirection
-          if(extractRedirectText && startElementName.equals(PAGE_REVISION_TEXT_TAG)) {
-            redirectMatcher = pattern.matcher(targetReader.getElementText());
+          if(extractRedirectText && strStartElement.equals(PAGE_REVISION_TEXT_TAG)) {
+            // process revision tag only for redirection.
+            redirectMatcher = pattern.matcher(reader.getElementText());
             while(redirectMatcher.find()) {
               redirectTitle = redirectMatcher.group(1);
             }
@@ -161,15 +231,35 @@ public class WikiRevTools {
         }
       }
 
-      if(pageId != -1 && redirectTitle != null) {
-        redirectId = titleIdMap.get(redirectTitle);
-        redirectIds.put(pageId, redirectId);
-        redirectTitle = null;
-      }
-
       if (event.isEndElement()) {
         EndElement endElement = event.asEndElement();
         if (endElement.getName().getLocalPart().equals(PAGE_TAG)) {
+          // process retrieved page related information depending on the dump.
+          if(loadAdditionalInfo) {
+            if(pageId != -1 && redirectTitle != null) {
+              redirectId = titleIdMap.get(redirectTitle);
+              redirectIds.put(pageId, redirectId);
+              redirectTitle = null;
+            }
+          } else if(dumpType.equals(DumpType.NEW) && actionType.equals(TargetAction.LOAD_PAGE_INFO)) {
+            if(pageId != -1 && title != null) {
+              idTitleMap.put(pageId, title);
+              titleIdMap.put(title, pageId);
+            }
+          } else if(dumpType.equals(DumpType.OLD)) {
+            if(pageId != -1 && title != null) {
+              // check whether this id is redirected to another element
+              redirectId = resolveRedirection(redirectIds, pageId);
+              String targetTitle = idTitleMap.get(redirectId);
+              // check whether the source dump's id is pointing to same title
+              if(!title.equals(targetTitle) || includeUnchangedEntries) {
+                finalMap.put(title, targetTitle);
+              }
+              pageId = -1;
+              title = null;
+            }
+          }
+
           // reset for new page
           pageId = -1;
           title = null;
@@ -177,62 +267,15 @@ public class WikiRevTools {
           if(processedPages % 100000 == 0) {
             logger_.debug("Processed " + processedPages + " page entries.");
           }
-        }else if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
+        } else if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
           processingRevisionTag = false;
         }
       }
     }
-
-    logger_.info("Time to scan target (2nd Scan - Redirects,Disambiguations) : " + (System.currentTimeMillis() - start) / 1000 + " s.");
-    // finally iterate over source dump file and construct the final change map
-    processedPages = 0;
-    Map<String, String> finalMap = new HashMap<String, String>();
-    start = System.currentTimeMillis();
-    while(sourceReader.hasNext()) {
-      event = sourceReader.nextEvent();
-      if (event.isStartElement()) {
-        StartElement startElement = event.asStartElement();
-
-        if(pageId == -1 && startElement.getName().getLocalPart().equals(PAGE_ID_TAG)) {
-          pageId = Integer.parseInt(sourceReader.nextEvent().asCharacters().getData());
-        } else if( title == null && startElement.getName().getLocalPart().equals(PAGE_TITLE_TAG)) {
-          title = sourceReader.nextEvent().asCharacters().getData();
-        }
-      }
-
-      if(pageId != -1 && title != null) {
-        // check whether this id is redirected to another element
-        redirectId = resolveRedirection(redirectIds, pageId);
-        String targetTitle = idTitleMap.get(redirectId);
-        // check whether the source dump's id is pointing to same title
-        if(!title.equals(targetTitle) || includeUnchangedEntries) {
-          finalMap.put(title, targetTitle);
-        }
-        pageId = -1;
-        title = null;
-      }
-
-      if (event.isEndElement()) {
-        EndElement endElement = event.asEndElement();
-        if (endElement.getName().getLocalPart().equals(PAGE_TAG)) {
-          // reset for new page
-          pageId = -1;
-          title = null;
-          processedPages++;
-          if(processedPages % 100000 == 0) {
-            logger_.debug("Processed " + processedPages + " page entries.");
-          }
-        }
-      }
-    }
-    logger_.info("Time to scan source dump : " + ((System.currentTimeMillis() - start) / 1000) + " s.");
-    return finalMap;
   }
 
-  /*
-   * This method resolves redirection pages(including multiple redirections).
-   * In case of a cycle, the given id is returned i.e id is mapped on to itself.
-   */
+  //This method resolves redirection pages(including multiple redirections).
+  //  In case of a cycle, the given id is returned i.e id is mapped on to itself.
   private static int resolveRedirection(TIntIntHashMap redirectIds, int redirectId) {
     TIntSet processed = new TIntHashSet();
     processed.add(redirectId);
@@ -252,24 +295,6 @@ public class WikiRevTools {
     return itK;
   }
 
-  public static void mapToFile(File source, File target, File output) throws IOException, XMLStreamException {
-    // by default, include the unchanged entries as well.
-    mapToFile(source, target, output, true);
-  }
-
-  public static void mapToFile(File source, File target, File output, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
-    Map<String, String> result = map(source, target, includeUnchangedEntries);
-    logger_.debug("Writing results to file : " + output.getName());
-    try{
-      // just in case delete any old file
-      output.delete();
-      writeFileContent(output, result);
-      System.out.println("Output written");
-    }catch(IOException ioe) {
-      logger_.info("Failed to write results to file");
-    }
-  }
-
   @SuppressWarnings("static-access")
   private static Options buildCommandLineOptions() throws ParseException {
     Options options = new Options();
@@ -285,18 +310,18 @@ public class WikiRevTools {
     .addOption(OptionBuilder
         .withLongOpt("source")
         .withDescription(
-            "Source dump to be mapped")
+            "Old dump to be mapped")
             .hasArg()
-            .withArgName("SOURCEDUMP")
-            .create("s"));
+            .withArgName("OLD_DUMP")
+            .create("o"));
     options
     .addOption(OptionBuilder
         .withLongOpt("target")
         .withDescription(
-            "Target dump to be check")
+            "New dump to check against")
             .hasArg()
-            .withArgName("TARGETDUMP")
-            .create("t"));
+            .withArgName("NEW_DUMP")
+            .create("n"));
     options
     .addOption(OptionBuilder
         .withLongOpt("output")
@@ -310,7 +335,7 @@ public class WikiRevTools {
   }
 
   private static void printHelp(Options commandLineOptions) {
-    String header = "\n\nWiki Revision Tool:\n\n";
+    String header = "\n\nWikipedia Revision Tools:\n\n";
     HelpFormatter formatter = new HelpFormatter();
     formatter.printHelp("WikiRevTools", header,
         commandLineOptions, "", true);
@@ -350,18 +375,18 @@ public class WikiRevTools {
     cmdStr = cmd.getOptionValue('c');
     switch (cmdStr) {
       case "MAP":
-        if(!cmd.hasOption('s') || !cmd.hasOption('t')) {
-          System.out.println("\n\n MAP command needs SOURCE and TARGET options.\n\n");
+        if(!cmd.hasOption('o') || !cmd.hasOption('n')) {
+          System.out.println("\n\n MAP command needs OLD_DUMP and NEW_DUMP options.\n\n");
           printHelp(commandLineOptions);
         }
 
-        String srcDump = cmd.getOptionValue('s');
-        String targetDump = cmd.getOptionValue('t');
+        String oldDump = cmd.getOptionValue('o');
+        String newDump = cmd.getOptionValue('n');
         if(cmd.hasOption('w')) {
           String outputFile = cmd.getOptionValue('w');
-          mapToFile(new File(srcDump), new File(targetDump), new File(outputFile));
+          mapToFile(new File(oldDump), new File(newDump), new File(outputFile));
         } else {
-          Map<String, String> hshResults = map(new File(srcDump), new File(targetDump));
+          Map<String, String> hshResults = map(new File(oldDump), new File(newDump));
           for(Entry<String, String> e : hshResults.entrySet()) {
             System.out.println(e.getKey() + "\t" + e.getValue());
           }

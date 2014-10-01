@@ -276,7 +276,6 @@ public class WikiRevToolsDiffTest {
 
   @Test
   public void testRedirectionCycle() throws IOException, XMLStreamException {
-    System.out.println("Redirection Cycle");
     // source dump
     File tmpSrcDump = File.createTempFile("wiki-src-dump", "xml");
     File tmpTargetDump = File.createTempFile("wiki-target-dump", "xml");
