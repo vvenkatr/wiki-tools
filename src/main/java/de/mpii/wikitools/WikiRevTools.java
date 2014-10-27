@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -56,6 +57,9 @@ public class WikiRevTools {
   private static final String PAGE_REVISION_TAG = "revision";
   private static final String PAGE_REDIRECT_TAG = "redirect";
   private static final String PAGE_REVISION_TEXT_TAG = "text";
+
+  // Maximum length of wiki page text to use in output
+  private static final int MAX_TEXT_LENGTH = 1000;
 
   // Wikipedia page revision text will be matched against this pattern to retrieve name links.
   private static Pattern pattern = Pattern.compile("\\[\\[(.*?)\\]\\]");
@@ -277,14 +281,11 @@ public class WikiRevTools {
               // ok. now, extract all links the text, to be used for disambiguation
               // TODO: verify the possibility of having current title in some other page's disambiguation
               // if so, need to store the current disambiguation title's content in page content.
-              logger_.debug("Processing : " + title + revisionTextContent);
               List<String> lstLinks = extractLinks(revisionTextContent);
               if(containsDisambiguation(revisionTextContent)) {
                 disambiguationPageLinks.put(title, lstLinks);
-                logger_.debug(disambiguationPageLinks.toString());
               } else {
                 pageContent.put(title, lstLinks);
-                logger_.debug(pageContent.toString());
               }
               // store text entry of page
               newDumpPageText.put(title, cleanupText(revisionTextContent));
@@ -353,17 +354,19 @@ public class WikiRevTools {
   }
 
   private static String disambiguate(String targetTitle, String revisionTextContent) {
-    logger_.debug("Disambiguating : " + targetTitle);
+    // logger_.debug("Disambiguating : " + targetTitle);
     List<String> lstChoices = disambiguationPageLinks.get(targetTitle);
+    lstChoices = verifyList(lstChoices);
     // for each disambiguation option, get the content stored in pageContent
     // and compute similarity
     double maxScore = 0.0;
-    String result = "";
+    String result = targetTitle; // return the current targetTitle, if no disambiguations are found
     for(String pageChoice : lstChoices) {
+      // wiki entry in source might have been deleted in target. Hence there might be no entries in pageContent
       List<String> pageLinks = pageContent.get(pageChoice);
       List<String> currentPageLinks = extractLinks(revisionTextContent);
       double score = computeSimilarity(currentPageLinks, pageLinks);
-      logger_.debug("Score for " + pageChoice + " : " + score);
+      // logger_.debug("Score for " + pageChoice + " : " + score);
       if(score > maxScore) {
         result = pageChoice;
         maxScore = score;
@@ -374,10 +377,9 @@ public class WikiRevTools {
 
   private static String cleanupText(String text) {
     if(text == null) return text;
-    String tmpText = text.replaceAll("\n", " ");
-    tmpText = (tmpText != null) ? tmpText.replaceAll("\\s+", " ") : text.replaceAll("\\s+", " ");
-    tmpText = (tmpText != null) ? tmpText : text;
-    int maxLimit = (tmpText.length() < 1000) ? text.length() : 1000;
+    text = text.replaceAll("\n", "");
+    text = text.replaceAll("\\s+", " ");
+    int maxLimit = (text.length() < MAX_TEXT_LENGTH) ? text.length() : MAX_TEXT_LENGTH;
     return text.substring(0, maxLimit);
   }
 
@@ -403,8 +405,8 @@ public class WikiRevTools {
   }
 
   private static double computeSimilarity(List<String> list1, List<String> list2) {
-    Set<String> set1 = new HashSet<>(list1);
-    Set<String> set2 = new HashSet<>(list2);
+    Set<String> set1 = new HashSet<>(verifyList(list1));
+    Set<String> set2 = new HashSet<>(verifyList(list2));
 
     int sizeCurrentSet = set1.size();
     set1.retainAll(set2);
@@ -413,6 +415,10 @@ public class WikiRevTools {
     int union = sizeCurrentSet + set2.size();
     int intersection = set1.size();
     return ((double)intersection)/union;
+  }
+
+  private static List<String> verifyList(List<String> list) {
+    return (list != null) ? list : new ArrayList<String>();
   }
 
   private static String extractRedirectTitle(String content) {
