@@ -38,8 +38,6 @@ public class WikiRevToolsDiffTest {
     // setting the flag to false will include unchanged entries
     hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(0, hshResults.size());
-    // WikiRevTools.diffToFile(tmpSrcDump, tmpTargetDump, opFile);
-    // WikiRevTools.diffToFile(tmpSrcDump, tmpTargetDump, opFile, opFormat);
     // remove tmp files
     tmpSrcDump.delete();
     tmpTargetDump.delete();
@@ -346,8 +344,8 @@ public class WikiRevToolsDiffTest {
     assertEquals(4, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    // hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
     // assertEquals(1, hshResults.size());
-    assertEquals(hshResults.get("Einstein"), "Albert Einstein");
+    assertEquals("Albert Einstein", hshResults.get("Einstein"));
   }
 }
