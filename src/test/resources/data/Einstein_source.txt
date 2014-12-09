@@ -48,7 +48,7 @@
         <id>49920</id>
       </contributor>
       <text xml:space='preserve'>
-	Einstein Observatory (HEAO-2) was the first fully imaging [[X-ray telescope|X-ray telescope]] put into space and the second of [[NASA|NASA]]'s three High Energy Astrophysical Observatories. Named HEAO B before launch, the observatory's name was changed to honor Albert Einstein upon its successfully attaining orbit.The Einstein Observatory, HEAO-2, was launched on November 13, 1978, from [[Cape_Canaveral|Cape Canaveral]], [[Florida|Florida]], on an Atlas-Centaur SLV-3D booster rocket into a near-circular orbit with an initial altitude slightly above 500 km. Its orbital inclination orbit was 23.5 degrees. The Einstein Observatory satellite re-entered the Earth's atmosphere and burned up on March 25, 1982.
+	Einstein Observatory (HEAO-2) was the first fully imaging [[X-ray telescope|X-ray telescope]] put into space and the second of [[NASA|NASA]]'s three High Energy Astrophysical Observatories. Named HEAO B before launch, the observatory's name was changed to honor Albert Einstein who was from [[Ulm|Ulm]] in [[Germany|Germany]] upon its successfully attaining orbit.The Einstein Observatory, HEAO-2, was launched on November 13, 1978, from [[Cape_Canaveral|Cape Canaveral]], [[Florida|Florida]], on an Atlas-Centaur SLV-3D booster rocket into a near-circular orbit with an initial altitude slightly above 500 km. Its orbital inclination orbit was 23.5 degrees. The Einstein Observatory satellite re-entered the Earth's atmosphere and burned up on March 25, 1982.
       </text>
     </revision>
   </page>

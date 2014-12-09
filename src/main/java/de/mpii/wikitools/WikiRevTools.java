@@ -16,10 +16,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +38,8 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import de.mpii.wikitools.compute.Jaccard;
 
 /**
  * This class consists of static methods that operate on either individual Wikipedia dump file or
@@ -386,7 +386,8 @@ public class WikiRevTools {
       // wiki entry in source might have been deleted in target. Hence there might be no entries in pageContent
       List<String> pageLinks = pageIdContent.get(pId);
       List<String> currentPageLinks = extractLinks(revisionTextContent);
-      double score = computeSimilarity(currentPageLinks, pageLinks);
+      double score = Jaccard.compute(currentPageLinks, pageLinks);
+      System.out.println(pageChoice + " " + score);
       if(score > maxScore) {
         result = pId;
         maxScore = score;
@@ -423,19 +424,6 @@ public class WikiRevTools {
     }
     if(found) return redirectId;
     return itK;
-  }
-
-  private static double computeSimilarity(List<String> list1, List<String> list2) {
-    Set<String> set1 = new HashSet<>(verifyList(list1));
-    Set<String> set2 = new HashSet<>(verifyList(list2));
-
-    int sizeCurrentSet = set1.size();
-    set1.retainAll(set2);
-    set2.removeAll(set1);
-
-    int union = sizeCurrentSet + set2.size();
-    int intersection = set1.size();
-    return ((double)intersection)/union;
   }
 
   private static List<String> verifyList(List<String> list) {
@@ -476,7 +464,7 @@ public class WikiRevTools {
 
   private static boolean containsDisambiguation(String content) {
     for(String dTerm : DISAMBIGUATION_TERMS) {
-      if(content.contains(dTerm))
+      if(content.contains(dTerm) || content.contains(dTerm.toLowerCase()))
         return true;
     }
     return false;
