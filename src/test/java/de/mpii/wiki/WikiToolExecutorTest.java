@@ -1,4 +1,4 @@
-package de.mpii.wikitools;
+package de.mpii.wiki;
 
 import static org.junit.Assert.assertEquals;
 
@@ -14,7 +14,7 @@ import javax.xml.stream.XMLStreamException;
 
 import org.junit.Test;
 
-public class WikiRevToolsDiffTest {
+public class WikiToolExecutorTest {
 
   @Test
   public void testUnchangedPageEntries() throws IOException, XMLStreamException {
@@ -32,11 +32,11 @@ public class WikiRevToolsDiffTest {
     bw.close();
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
     assertEquals(2, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(0, hshResults.size());
     // remove tmp files
     tmpSrcDump.delete();
@@ -77,11 +77,11 @@ public class WikiRevToolsDiffTest {
     bw.close();
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
     assertEquals(2, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(1, hshResults.size());
     assertEquals(true, hshResults.containsKey("Test2"));
     assertEquals("NEW_Test2", hshResults.get("Test2"));
@@ -125,7 +125,7 @@ public class WikiRevToolsDiffTest {
         + "</mediawiki>");
     bw.close();
     // setting the flag to false will include unchanged entries
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
     assertEquals(true, hshResults.containsKey("Test2"));
     assertEquals(null, hshResults.get("Test2"));
   }
@@ -133,15 +133,19 @@ public class WikiRevToolsDiffTest {
   @Test
   public void testSinglePageRedirection() throws IOException, XMLStreamException {
     // source dump
-    File tmpSrcDump = File.createTempFile("wiki-src-dump", "xml");
-    File tmpTargetDump = File.createTempFile("wiki-target-dump", "xml");
+    File tmpOldDump = File.createTempFile("wiki-src-dump", "xml");
+    File tmpNewDump = File.createTempFile("wiki-target-dump", "xml");
 
     // base structure - "<mediawiki><page><title></title><id><id></page></mediawiki>"
-    BufferedWriter bw = new BufferedWriter(new FileWriter(tmpSrcDump));
+    BufferedWriter bw = new BufferedWriter(new FileWriter(tmpOldDump));
     bw.write("<mediawiki>"
         + "<page>"
         + "<title>Test1</title>"
         + "<id>1</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">This is entry about Test1 and it will be redirected.</text>"
+        + "</revision>"
         + "</page>"
         + "<page>"
         + "<title>Test2</title>"
@@ -154,7 +158,7 @@ public class WikiRevToolsDiffTest {
         + "</mediawiki>");
     bw.close();
 
-    bw = new BufferedWriter(new FileWriter(tmpTargetDump));
+    bw = new BufferedWriter(new FileWriter(tmpNewDump));
     bw.write("<mediawiki>"
         + "<page>"
         + "<title>Test1</title>"
@@ -175,7 +179,9 @@ public class WikiRevToolsDiffTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpOldDump, tmpNewDump);
+    System.out.println("TEST SINGLE PAGE REDIRECTION");
+    System.out.println(hshResults);
     assertEquals(3, hshResults.size());
     assertEquals("Test3", hshResults.get("Test1"));
   }
@@ -192,22 +198,42 @@ public class WikiRevToolsDiffTest {
         + "<page>"
         + "<title>Test1</title>"
         + "<id>1</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">This is entry about Test1 and it will be redirected.</text>"
+        + "</revision>"
         + "</page>"
         + "<page>"
         + "<title>Test2</title>"
         + "<id>2</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">This is entry about Test2.</text>"
+        + "</revision>"
         + "</page>"
         + "<page>"
         + "<title>Test3</title>"
         + "<id>3</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">This is entry about Test3 and it will be redirected.</text>"
+        + "</revision>"
         + "</page>"
         + "<page>"
         + "<title>Test4</title>"
         + "<id>4</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">This is entry about Test4 and it will be redirected.</text>"
+        + "</revision>"
         + "</page>"
         + "<page>"
         + "<title>Test5</title>"
         + "<id>5</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">This is entry about Test5 and it will be redirected.</text>"
+        + "</revision>"
         + "</page>"
         + "<page>"
         + "<title>Test6</title>"
@@ -264,7 +290,10 @@ public class WikiRevToolsDiffTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    System.out.println("TEST MULTI PAGE REDIRECTION");
+    System.out.println(hshResults);
+
     assertEquals(6, hshResults.size());
 
     // 1 -> 3 -> 4 -> 5 -> 6
@@ -324,7 +353,7 @@ public class WikiRevToolsDiffTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
     assertEquals(3, hshResults.size());
     // Test1 REDIRECTS TO Test3, but since it forms a cycle, Test1 is mapped to itself
     assertEquals(true, !hshResults.get("Test1").equals("Test3"));
@@ -340,11 +369,11 @@ public class WikiRevToolsDiffTest {
     File tmpTargetDump = new File(targetUrl.toURI());
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
     assertEquals(4, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiRevTools.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump, false);
     // assertEquals(1, hshResults.size());
     assertEquals("Albert Einstein", hshResults.get("Einstein"));
   }

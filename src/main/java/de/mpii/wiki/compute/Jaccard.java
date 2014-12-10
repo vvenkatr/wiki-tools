@@ -1,4 +1,4 @@
-package de.mpii.wikitools.compute;
+package de.mpii.wiki.compute;
 
 import java.util.ArrayList;
 import java.util.HashSet;

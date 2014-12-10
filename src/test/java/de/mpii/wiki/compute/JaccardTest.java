@@ -1,9 +1,11 @@
-package de.mpii.wikitools.compute;
+package de.mpii.wiki.compute;
 
 import java.util.Arrays;
 import java.util.List;
 
 import org.junit.Test;
+
+import de.mpii.wiki.compute.Jaccard;
 
 
 public class JaccardTest {

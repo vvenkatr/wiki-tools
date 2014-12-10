@@ -1,4 +1,4 @@
-package de.mpii.wikitools;
+package de.mpii.wiki;
 
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
@@ -39,7 +39,7 @@ import org.apache.commons.cli.PosixParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import de.mpii.wikitools.compute.Jaccard;
+import de.mpii.wiki.compute.Jaccard;
 
 /**
  * This class consists of static methods that operate on either individual Wikipedia dump file or
@@ -48,7 +48,7 @@ import de.mpii.wikitools.compute.Jaccard;
  * @author vvenkatr
  *
  */
-public class WikiRevTools {
+public class WikiToolExecutor {
 
   // Xml markups used in Wikipedia dump file.
 
@@ -56,14 +56,18 @@ public class WikiRevTools {
   private static final String PAGE_ID_TAG = "id";
   private static final String PAGE_TITLE_TAG = "title";
   private static final String PAGE_REVISION_TAG = "revision";
-  private static final String PAGE_REDIRECT_TAG = "redirect";
   private static final String PAGE_REVISION_TEXT_TAG = "text";
+  // commenting this out for the time being since, text is searched for redirect terms
+  // private static final String PAGE_REDIRECT_TAG = "redirect";
 
   // Mapping result indicator
-  private static final String redirectedEntry = "__R__";
-  private static final String disambiguatedEntry = "__D__";
-  private static final String unchangedEntry = "__U__";
-  private static final String redirectedCyle = "__C__";
+  private static final String REDIRECTED_ENTRY = "__R__";
+  private static final String DISAMBIGUATED_ENTRY = "__D__";
+  private static final String UNCHANGED = "__U__";
+  private static final String REDIRECTED_CYCLE = "__C__";
+
+  // Counter to keep track of processed page count
+  private static int processedPages = 0;
 
   // Maximum length of wiki page text to use in output
   private static final int MAX_TEXT_LENGTH = 1000;
@@ -72,11 +76,15 @@ public class WikiRevTools {
   private static Pattern pattern = Pattern.compile("\\[\\[(.*?)\\]\\]");
 
   //maps to store id, title relation (for target dump)
-  private static TIntObjectMap<String> targetDumpIdTitleMap;
-  private static TObjectIntMap<String> targetDumpTitleIdMap;
+  private static TIntObjectMap<String> newDumpIdTitleMap;
+  private static TObjectIntMap<String> newDumpTitleIdMap;
 
   //maps to store id, title relation (for source dump)
-  private static TIntObjectMap<String> sourceDumpIdTitleMap;
+  private static TIntObjectMap<String> oldDumpIdTitleMap;
+
+  private static TIntObjectMap<String> oldDumpDisambiguationEntries;
+
+  private static TIntObjectMap<String> oldDumpRedirectEntries;
 
   // map to store Redirections
   private static TIntIntMap redirectIds;
@@ -109,11 +117,16 @@ public class WikiRevTools {
 
   private static Options commandLineOptions;
 
-  private static Logger logger_ = LoggerFactory.getLogger(WikiRevTools.class);
+  private static Logger logger_ = LoggerFactory.getLogger(WikiToolExecutor.class);
 
   private enum DumpType {
     OLD, NEW;
   }
+
+  // To be used mainly with source dump
+  private static final String[] REDIRECT_TERMS = new String[] { 
+    "#REDIRECT","#Redirect"
+  };
 
   private static final String[] DISAMBIGUATION_TERMS = new String[] {"{{Disambig}}","{{Airport_disambig}}",
     "{{Battledist}}","{{Callsigndis}}","{{Chemistry disambiguation}}",
@@ -167,8 +180,8 @@ public class WikiRevTools {
   public static Map<String, String> map(File oldDump, File newDump, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
     TIntIntMap results = mapImpl(oldDump, newDump);
     for(int pid : results.keys()) {
-      String title = sourceDumpIdTitleMap.get(pid);
-      String target = targetDumpIdTitleMap.get(results.get(pid));
+      String title = oldDumpIdTitleMap.get(pid);
+      String target = newDumpIdTitleMap.get(results.get(pid));
       if(includeEntry(title, target, includeUnchangedEntries)) {
         finalMap.put(title, target);
       }
@@ -177,9 +190,9 @@ public class WikiRevTools {
   }
 
   private static void init() {
-    targetDumpIdTitleMap = new TIntObjectHashMap<String>();
-    targetDumpTitleIdMap = new TObjectIntHashMap<String>();
-    sourceDumpIdTitleMap = new TIntObjectHashMap<String>();
+    newDumpIdTitleMap = new TIntObjectHashMap<String>();
+    newDumpTitleIdMap = new TObjectIntHashMap<String>();
+    oldDumpIdTitleMap = new TIntObjectHashMap<String>();
     redirectIds = new TIntIntHashMap();
     finalMap = new HashMap<String, String>();
     finalIdMap = new TIntIntHashMap();
@@ -190,6 +203,8 @@ public class WikiRevTools {
     disambiguatedPageIds = new TIntHashSet();
     newDumpPageIdText = new TIntObjectHashMap<String>();
     oldDumpPageIdText = new TIntObjectHashMap<String>();
+    oldDumpDisambiguationEntries = new TIntObjectHashMap<>();
+    oldDumpRedirectEntries = new TIntObjectHashMap<>();
   }
 
   private static TIntIntMap mapImpl(File oldDump, File newDump) throws IOException, XMLStreamException  {
@@ -213,7 +228,7 @@ public class WikiRevTools {
     // finally, iterate over the source dump and build the output mapping.
     // Passing *null* as it will not be considered at all for SOURCE
     start = System.currentTimeMillis();
-    processReader(oldDumpReader, DumpType.OLD, null);
+    processReader(oldDumpReader, DumpType.OLD, TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS);
     logger_.debug("Time to scan old version of dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
 
     return finalIdMap;
@@ -265,23 +280,16 @@ public class WikiRevTools {
 
   // private helper methods
 
-  private static boolean includeEntry(String title, String targetTitle, boolean includeUnchangedEntries) {
-    return (!title.equals(targetTitle) || includeUnchangedEntries);
-  }
-
   private static void processReader(XMLEventReader reader,
       DumpType dumpType, TargetAction actionType) throws XMLStreamException {
 
-    int processedPages = 0;
+    // basic page info
     int pageId = -1;
     int targetPageId = -1;
     String title = null;
-    boolean processingRevisionTag = false;
-    boolean extractRedirectText = false;
-    String revisionTextContent = null;
+    String pageText = "";
 
-    boolean loadAdditionalInfo = dumpType.equals(DumpType.NEW)
-        && actionType.equals(TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS);
+    boolean withinRevisionTag = false;
 
     while (reader.hasNext()) {
       XMLEvent event = reader.nextEvent();
@@ -290,33 +298,43 @@ public class WikiRevTools {
         String strStartElement = startElement.getName().getLocalPart();
 
         if(strStartElement.equals(PAGE_REVISION_TAG)) {
-          processingRevisionTag = true;
+          withinRevisionTag = true;
         }
 
-        if(!processingRevisionTag) {
-          if(strStartElement.equals(PAGE_ID_TAG)) {
-            pageId = Integer.parseInt(reader.nextEvent().asCharacters().getData());
-          } else if(strStartElement.equals(PAGE_TITLE_TAG)) {
-            title = reader.nextEvent().asCharacters().getData();
-          } else if( loadAdditionalInfo  && strStartElement.equals(PAGE_REDIRECT_TAG)) {
-            extractRedirectText = true;
+        if(!withinRevisionTag) {
+          switch (strStartElement) {
+            case PAGE_ID_TAG:
+              pageId = Integer.parseInt(reader.nextEvent().asCharacters().getData());
+              break;
+            case PAGE_TITLE_TAG:
+              title = reader.nextEvent().asCharacters().getData();
+              break;
+              //            case PAGE_REDIRECT_TAG:
+              //              if(loadAdditionalInfo) {
+              //                extractRedirectText = true;
+              //              }
+              //              break;
+            default:
+              break;
           }
         } else {
           if(strStartElement.equals(PAGE_REVISION_TEXT_TAG)) {
-            revisionTextContent = reader.getElementText();
-            if(extractRedirectText) {
-              targetPageId = extractRedirectId(revisionTextContent);
-              extractRedirectText = false;
-            } else if(loadAdditionalInfo) {
-              // extract all links the text, to be used for disambiguation
-              List<String> lstLinks = extractLinks(revisionTextContent);
-              if(containsDisambiguation(revisionTextContent)) {
-                disambiguationPageIdLinks.put(pageId, lstLinks);
-              } else {
-                pageIdContent.put(pageId, lstLinks);
-              }
-              // store text entry of page
-              newDumpPageIdText.put(pageId, cleanupText(revisionTextContent));
+            pageText = reader.getElementText();
+            switch (dumpType) {
+              case NEW:
+                if(actionType.equals(TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS)) {
+                  // A page can either be a REDIRECT or DISAMBIGUATED not both.
+                  if(containsRedirectText(pageText)) {
+                    targetPageId = extractRedirectId(pageText);
+                    break;
+                  }
+                  updatePageDisambiguation(pageId, pageText);
+                }
+                break;
+              case OLD:
+              default:
+                // nothing to do, just retain the pageText for processing during PAGE_END
+                break;
             }
           }
         }
@@ -324,56 +342,92 @@ public class WikiRevTools {
 
       if (event.isEndElement()) {
         EndElement endElement = event.asEndElement();
-        if (endElement.getName().getLocalPart().equals(PAGE_TAG)) {
+        if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
+          withinRevisionTag = false;
+        }else if (endElement.getName().getLocalPart().equals(PAGE_TAG)) {
           // process retrieved page related information depending on the dump.
-          if(loadAdditionalInfo) {
-            if(pageId != -1 && targetPageId != -1) {
-              redirectIds.put(pageId, targetPageId);
-            }
-          } else if(dumpType.equals(DumpType.NEW) && actionType.equals(TargetAction.LOAD_PAGE_INFO)) {
-            if(pageId != -1 && title != null) {
-              targetDumpIdTitleMap.put(pageId, title);
-              targetDumpTitleIdMap.put(title, pageId);
-            }
-          } else if(dumpType.equals(DumpType.OLD)) {
-            if(pageId != -1 && title != null) {
-              sourceDumpIdTitleMap.put(pageId, title);
-
-              targetPageId = resolveRedirection(redirectIds, pageId);
-              boolean redirected = (targetPageId != pageId);
-              boolean disambiguated = false;
-              if(!redirected && disambiguationPageIdLinks.containsKey(pageId)) {
-                // If the source page is also a disambiguation page, do nothing.
-                if(!containsDisambiguation(revisionTextContent)) {
-                  targetPageId = disambiguate(pageId, revisionTextContent);
-                  disambiguated = true;
+          switch (dumpType) {
+            case NEW:
+              if(actionType.equals(TargetAction.LOAD_REDIRECTS_DISAMBIGUATIONS)) {
+                if(pageId != -1 && targetPageId != -1) {
+                  redirectIds.put(pageId, targetPageId);
+                }
+              } else if(actionType.equals(TargetAction.LOAD_PAGE_INFO)) {
+                if(pageId != -1 && title != null) {
+                  newDumpIdTitleMap.put(pageId, title);
+                  newDumpTitleIdMap.put(title, pageId);
                 }
               }
+              break;
+            case OLD:
+              if(pageId != -1 && title != null) {
+                //oldDumpIdTitleMap.put(pageId, title);
+                if(containsDisambiguation(pageText)) {
+                  oldDumpDisambiguationEntries.put(pageId, title);
+                } else if(containsRedirectText(pageText)) {
+                  oldDumpRedirectEntries.put(pageId, title);
+                } else {
+                  oldDumpIdTitleMap.put(pageId, title);
+                  targetPageId = resolveRedirection(redirectIds, pageId);
+                  boolean redirected = (targetPageId != pageId);
+                  boolean disambiguated = false;
+                  if(!redirected && disambiguationPageIdLinks.containsKey(pageId)) {
+                    // If the source page is also a disambiguation page, do nothing.
+                    if(!containsDisambiguation(pageText)) {
+                      targetPageId = disambiguate(pageId, pageText);
+                      disambiguated = true;
+                    }
+                  }
 
-              oldDumpPageIdText.put(pageId, cleanupText(revisionTextContent));
-              finalIdMap.put(pageId, targetPageId);
+                  oldDumpPageIdText.put(pageId, cleanupText(pageText));
+                  finalIdMap.put(pageId, targetPageId);
 
-              if(redirected) {
-                redirectedPageIds.add(pageId);
-              } else if(disambiguated) {
-                disambiguatedPageIds.add(pageId);
+                  if(redirected) {
+                    redirectedPageIds.add(pageId);
+                  } else if(disambiguated) {
+                    disambiguatedPageIds.add(pageId);
+                  }
+                }
               }
-            }
+              break;
+            default:
+              break;
           }
+
           // reset for new page
           pageId = -1;
           targetPageId = -1;
           title = null;
-          processedPages++;
-          if(processedPages % 100000 == 0) {
-            logger_.debug("Processed " + processedPages + " page entries.");
-          }
-        }else if(endElement.getName().getLocalPart().equals(PAGE_REVISION_TAG)) {
-          processingRevisionTag = false;
+          pageText = "";
+          updateCounter();
         }
       }
     }
   }
+
+  private static void updateCounter() {
+    processedPages++;
+    if(processedPages % 100000 == 0) {
+      logger_.debug("Processed " + processedPages + " page entries.");
+    }
+  }
+
+  private static boolean includeEntry(String title, String targetTitle, boolean includeUnchangedEntries) {
+    return (!title.equals(targetTitle) || includeUnchangedEntries);
+  }
+
+  private static void updatePageDisambiguation(int pageId, String pageText) {
+    // extract all links the text, to be used for disambiguation
+    List<String> lstLinks = extractLinks(pageText);
+    if(containsDisambiguation(pageText)) {
+      disambiguationPageIdLinks.put(pageId, lstLinks);
+    } else {
+      pageIdContent.put(pageId, lstLinks);
+    }
+    // store text entry of page
+    newDumpPageIdText.put(pageId, cleanupText(pageText));    
+  }
+
 
   private static int disambiguate(int pageId, String revisionTextContent) {
     List<String> lstChoices = disambiguationPageIdLinks.get(pageId);
@@ -382,7 +436,7 @@ public class WikiRevTools {
     double maxScore = 0.0;
     int result = pageId; // return the current pageId, if no disambiguations are found
     for(String pageChoice : lstChoices) {
-      int pId = targetDumpTitleIdMap.get(pageChoice);
+      int pId = newDumpTitleIdMap.get(pageChoice);
       // wiki entry in source might have been deleted in target. Hence there might be no entries in pageContent
       List<String> pageLinks = pageIdContent.get(pId);
       List<String> currentPageLinks = extractLinks(revisionTextContent);
@@ -433,8 +487,8 @@ public class WikiRevTools {
   private static int extractRedirectId(String content) {
     String tmp = extractRedirectTitle(content);
     int id = -1;
-    if(targetDumpTitleIdMap.containsKey(tmp)) {
-      id = targetDumpTitleIdMap.get(tmp);
+    if(newDumpTitleIdMap.containsKey(tmp)) {
+      id = newDumpTitleIdMap.get(tmp);
     }
     return id;
   }
@@ -462,10 +516,19 @@ public class WikiRevTools {
     return lstLinks;
   }
 
-  private static boolean containsDisambiguation(String content) {
-    for(String dTerm : DISAMBIGUATION_TERMS) {
-      if(content.contains(dTerm) || content.contains(dTerm.toLowerCase()))
+  private static boolean containsDisambiguation(String pageText) {
+    return containsAny(pageText, DISAMBIGUATION_TERMS);
+  }
+
+  private static boolean containsRedirectText(String pageText) {
+    return containsAny(pageText, REDIRECT_TERMS);
+  }
+
+  private static boolean containsAny(String text, String[] words) {
+    for(String ele : words) {
+      if(text.contains(ele) || text.contains(ele.toLowerCase())) {
         return true;
+      }
     }
     return false;
   }
@@ -512,7 +575,7 @@ public class WikiRevTools {
   private static void printHelp(Options commandLineOptions) {
     String header = "\n\nWikipedia Revision Tools:\n\n";
     HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp("WikiRevTools", header,
+    formatter.printHelp("WikiToolExecutor", header,
         commandLineOptions, "", true);
     System.exit(0);
   }
@@ -520,22 +583,22 @@ public class WikiRevTools {
   private static void writeFileContent(File file, TIntIntMap hshResults, boolean includeUnchangedEntries) throws IOException {
     BufferedWriter writer = getBufferedWriter(file);
     for(int pId : hshResults.keys()) {
-      String title = sourceDumpIdTitleMap.get(pId);
-      String target = targetDumpIdTitleMap.get(hshResults.get(pId));
+      String title = oldDumpIdTitleMap.get(pId);
+      String target = newDumpIdTitleMap.get(hshResults.get(pId));
       if(!includeEntry(title, target, includeUnchangedEntries)) {
         continue;
       }
       writer.append(title + "\t" + target + "\t");
       if(redirectionCyclesPageIds.contains(pId)) {
-        writer.append(redirectedCyle);
+        writer.append(REDIRECTED_CYCLE);
       }else if(redirectedPageIds.contains(pId)) {
-        writer.append(redirectedEntry);
+        writer.append(REDIRECTED_ENTRY);
       } else if(disambiguatedPageIds.contains(pId)){
-        writer.append(disambiguatedEntry);
+        writer.append(DISAMBIGUATED_ENTRY);
         // make sure to write src text and target text
         writer.append('\t').append(oldDumpPageIdText.get(pId)).append('\t').append(newDumpPageIdText.get(pId));
       } else {
-        writer.append(unchangedEntry);
+        writer.append(UNCHANGED);
       }
       writer.append("\n");
     }
@@ -580,21 +643,24 @@ public class WikiRevTools {
         } else {
           TIntIntMap hshResults = mapImpl(new File(oldDump), new File(newDump));
           for(int pId : hshResults.keys()) {
-            String title = sourceDumpIdTitleMap.get(pId);
-            String target = targetDumpIdTitleMap.get(hshResults.get(pId));
+            String title = oldDumpIdTitleMap.get(pId);
+            String target = newDumpIdTitleMap.get(hshResults.get(pId));
             System.out.print(title + "\t" + target + "\t");
             if(redirectedPageIds.contains(pId)) {
-              System.out.print(redirectedEntry);
+              System.out.print(REDIRECTED_ENTRY);
             } else if(disambiguatedPageIds.contains(pId)){
-              System.out.print(disambiguatedEntry + "\t"+oldDumpPageIdText.get(pId)+"\t"+newDumpPageIdText.get(pId));
+              System.out.print(DISAMBIGUATED_ENTRY + "\t"+oldDumpPageIdText.get(pId)+"\t"+newDumpPageIdText.get(pId));
               // make sure to write src text and target text
             } else {
-              System.out.print(unchangedEntry);
+              System.out.print(UNCHANGED);
             }
             System.out.println();
           }
         }
-        // done with the map
+        // done with the map - print stats
+        System.out.println(oldDumpDisambiguationEntries.size() + " entries ignored from source (contained disambiguation)");
+        System.out.println(oldDumpRedirectEntries.size() + " entries ignored from source (contained redirects)");        
+        System.out.println(disambiguatedPageIds.size() + " PAGE to DISAMBIGUATION PAGE entries processed.");
         break;
       default:
         printHelp(commandLineOptions);
