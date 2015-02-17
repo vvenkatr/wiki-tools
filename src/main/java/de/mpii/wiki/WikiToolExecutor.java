@@ -128,8 +128,9 @@ public class WikiToolExecutor {
     "#REDIRECT","#Redirect"
   };
 
-  private static final String[] DISAMBIGUATION_TERMS = new String[] {"{{Disambig}}","{{Airport_disambig}}",
-    "{{Battledist}}","{{Callsigndis}}","{{Chemistry disambiguation}}",
+  private static final String[] DISAMBIGUATION_TERMS = new String[] {
+    "{{Disambig}}","{{Airport_disambig}}","{{Battledist}}",
+    "{{Callsigndis}}","{{Chemistry disambiguation}}",
     "{{Church_disambig}}","{{Disambig-Chinese-char-title}}",
     "{{Disambig-cleanup}}","{{Genus_disambiguation}}",
     "{{Geodis}}","{{Hndis}}","{{Hndis-cleanup}}","{{Hospitaldis}}",
@@ -141,6 +142,14 @@ public class WikiToolExecutor {
     "{{WP_disambig}}"
   };
 
+  // some disambiguation marker texts that are encountered while processing older wiki dumps
+  private static final String[] UNUSED_DISAMBIGUATION_TERMS = new String[] {
+    "{{dab}}","{{disambiguation}}","{{geodab}}","geo-dis",
+    "disambig|geo","Disambig-CU", "disamb", "disambigua",
+    "Category:Disambiguation pages",
+    "Category:Molecular formula disambiguation pages"
+  };
+  
   private enum TargetAction {
     LOAD_PAGE_INFO, LOAD_REDIRECTS_DISAMBIGUATIONS;
   }
@@ -428,25 +437,27 @@ public class WikiToolExecutor {
     newDumpPageIdText.put(pageId, cleanupText(pageText));    
   }
 
-
   private static int disambiguate(int pageId, String revisionTextContent) {
     List<String> lstChoices = disambiguationPageIdLinks.get(pageId);
     lstChoices = verifyList(lstChoices);
     // for each disambiguation option, get the content stored in pageContent and compute similarity
     double maxScore = 0.0;
     int result = pageId; // return the current pageId, if no disambiguations are found
+    String choice = "";
     for(String pageChoice : lstChoices) {
       int pId = newDumpTitleIdMap.get(pageChoice);
       // wiki entry in source might have been deleted in target. Hence there might be no entries in pageContent
       List<String> pageLinks = pageIdContent.get(pId);
       List<String> currentPageLinks = extractLinks(revisionTextContent);
       double score = Jaccard.compute(currentPageLinks, pageLinks);
-      System.out.println(pageChoice + " " + score);
+      logger_.debug("Given Page Id : " + pageId + " Given Page Title : " + oldDumpIdTitleMap.get(pageId) + " Target Page : "+ pageChoice + " " + score);
       if(score > maxScore) {
         result = pId;
         maxScore = score;
+        choice = pageChoice;
       }
     }
+    logger_.debug("Final choice for : " + pageId + "(" + oldDumpIdTitleMap.get(pageId) +") ==> " + choice );
     return result;
   }
 
@@ -516,8 +527,9 @@ public class WikiToolExecutor {
     return lstLinks;
   }
 
-  private static boolean containsDisambiguation(String pageText) {
-    return containsAny(pageText, DISAMBIGUATION_TERMS);
+  private static boolean containsDisambiguation(String pageText) {    
+    return containsAny(pageText, DISAMBIGUATION_TERMS) 
+           || containsAny(pageText, UNUSED_DISAMBIGUATION_TERMS);
   }
 
   private static boolean containsRedirectText(String pageText) {
