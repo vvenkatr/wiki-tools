@@ -41,15 +41,15 @@ Input:
 Output:
  * A list of entries of format:
  	
- 	SOURCE_URL		TARGET_URL		MAP_TYPE	SOURCE_PAGE_TEXT(In evaluation mode)	TARGET_PAGE_TEXT(In evaluation mode)
+ SOURCE-URL	TARGET-URL	MAP-TYPE	SRC-TEXT(eval mode)	TGT-TEXT(eval mode)
  	
- 	where MAP_TYPE can be:
- 		* REDIRECT	(__R__)  - The target URL is obtained via redirect page
- 		* REDIRECT_CYCLE (__RC__) - The target URL redirects to itself or to entry that redirects back to the URL.
- 		* DISAMBIGUATION (__D__)  - The mapping is obtained by computing the similarity of source URL with all disambiguate pages the target points to.
- 		* UNCHANGED (__UC__)	- Source page is same as target.
- 		* UPDATED (__UP__)		- Source page id is same as target id but title information has been changed
- 		* DELETED (__DL__)		- The page entry in source dump has been removed in the target.
+ where MAP_TYPE can be:
+ - REDIRECT	(__R__)  - The target URL is obtained via redirect page
+ - REDIRECT_CYCLE (__RC__) - The target URL redirects to itself or to entry that redirects back to the URL.
+ - DISAMBIGUATION (__D__)  - The mapping is obtained by computing the similarity of source URL with all disambiguate pages the target points to.
+ - UNCHANGED (__UC__)	- Source page is same as target.
+ - UPDATED (__UP__)		- Source page id is same as target id but title information has been changed
+ - DELETED (__DL__)		- The page entry in source dump has been removed in the target.
  		
 Sample:
 	
