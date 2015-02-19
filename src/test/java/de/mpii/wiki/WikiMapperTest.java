@@ -14,7 +14,7 @@ import javax.xml.stream.XMLStreamException;
 
 import org.junit.Test;
 
-public class WikiToolExecutorTest {
+public class WikiMapperTest {
 
   @Test
   public void testUnchangedPageEntries() throws IOException, XMLStreamException {
@@ -32,11 +32,11 @@ public class WikiToolExecutorTest {
     bw.close();
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump);
     assertEquals(2, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(0, hshResults.size());
     // remove tmp files
     tmpSrcDump.delete();
@@ -77,11 +77,11 @@ public class WikiToolExecutorTest {
     bw.close();
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump);
     assertEquals(2, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump, false);
     assertEquals(1, hshResults.size());
     assertEquals(true, hshResults.containsKey("Test2"));
     assertEquals("NEW_Test2", hshResults.get("Test2"));
@@ -125,7 +125,7 @@ public class WikiToolExecutorTest {
         + "</mediawiki>");
     bw.close();
     // setting the flag to false will include unchanged entries
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump);
     assertEquals(true, hshResults.containsKey("Test2"));
     assertEquals(null, hshResults.get("Test2"));
   }
@@ -179,9 +179,7 @@ public class WikiToolExecutorTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpOldDump, tmpNewDump);
-    System.out.println("TEST SINGLE PAGE REDIRECTION");
-    System.out.println(hshResults);
+    Map<String, String> hshResults = WikiMapper.map(tmpOldDump, tmpNewDump);
     assertEquals(3, hshResults.size());
     assertEquals("Test3", hshResults.get("Test1"));
   }
@@ -290,7 +288,7 @@ public class WikiToolExecutorTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump);
     System.out.println("TEST MULTI PAGE REDIRECTION");
     System.out.println(hshResults);
 
@@ -353,7 +351,7 @@ public class WikiToolExecutorTest {
         + "</page>"
         + "</mediawiki>");
     bw.close();
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump);
     assertEquals(3, hshResults.size());
     // Test1 REDIRECTS TO Test3, but since it forms a cycle, Test1 is mapped to itself
     assertEquals(true, !hshResults.get("Test1").equals("Test3"));
@@ -369,11 +367,11 @@ public class WikiToolExecutorTest {
     File tmpTargetDump = new File(targetUrl.toURI());
 
     // default diff will also include all unchanged entries
-    Map<String, String> hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump);
+    Map<String, String> hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump);
     assertEquals(4, hshResults.size());
 
     // setting the flag to false will include unchanged entries
-    hshResults = WikiToolExecutor.map(tmpSrcDump, tmpTargetDump, false);
+    hshResults = WikiMapper.map(tmpSrcDump, tmpTargetDump, false);
     // assertEquals(1, hshResults.size());
     assertEquals("Albert Einstein", hshResults.get("Einstein"));
   }

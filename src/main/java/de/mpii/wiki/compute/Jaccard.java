@@ -1,15 +1,16 @@
 package de.mpii.wiki.compute;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import de.mpii.wiki.common.Utils;
+
 
 public class Jaccard {
   public static double compute(List<String> list1, List<String> list2) {
-    Set<String> set1 = new HashSet<>(verifyList(list1));
-    Set<String> set2 = new HashSet<>(verifyList(list2));
+    Set<String> set1 = new HashSet<>(Utils.verifyList(list1));
+    Set<String> set2 = new HashSet<>(Utils.verifyList(list2));
 
     int sizeCurrentSet = set1.size();
     set1.retainAll(set2);
@@ -17,10 +18,6 @@ public class Jaccard {
 
     int union = sizeCurrentSet + set2.size();
     int intersection = set1.size();
-    return ((double)intersection)/union;
-  }
-
-  private static List<String> verifyList(List<String> list) {
-    return (list != null) ? list : new ArrayList<String>();
+    return ((double)intersection)/(double)union;
   }
 }
