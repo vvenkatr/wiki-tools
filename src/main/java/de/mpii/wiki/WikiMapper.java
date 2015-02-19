@@ -41,6 +41,8 @@ public class WikiMapper {
 
   private static Options commandLineOptions;
 
+  private static boolean evaluate;
+
   private static Logger logger_ = LoggerFactory.getLogger(WikiMapper.class);
 
   /**
@@ -146,18 +148,23 @@ public class WikiMapper {
     XMLEventReader newDumpReader = factory.createXMLEventReader(new FileReader(newDump));
     XMLEventReader oldDumpReader = factory.createXMLEventReader(new FileReader(oldDump));
 
-    DumpData newDumpData = new DumpData(DumpType.TARGET);
-    DumpData oldDumpData = new DumpData(DumpType.SOURCE);
+    DumpType targetDumpType = (evaluate)? DumpType.TARGET_EVAL : DumpType.TARGET;
+    DumpType sourceDumpType = (evaluate)? DumpType.SOURCE_EVAL : DumpType.SOURCE;
+
+    DumpData newDumpData = new DumpData(targetDumpType);
+    DumpData oldDumpData = new DumpData(sourceDumpType);
     
     long start = System.currentTimeMillis();
     
+    logger_.debug("Processing Target Dump...");
     DumpReader.read(newDumpReader, newDumpData);
-    logger_.debug("Time to scan new dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
+    logger_.info("Time to scan target dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
 
     // iterate over the source dump
     start = System.currentTimeMillis();
+    logger_.debug("Processing Source Dump...");
     DumpReader.read(oldDumpReader, oldDumpData);
-    logger_.debug("Time to scan old dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
+    logger_.info("Time to scan source dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
     
     List<MappedResult> results = ResultGenerator.generate(oldDumpData, newDumpData);    
     return results;
@@ -184,12 +191,12 @@ public class WikiMapper {
             .isRequired()
             .withArgName("TARGET_DUMP")
             .create("t"));
-    options
-    .addOption(OptionBuilder
-        .withLongOpt("ignore-unchanged")
-        .withDescription(
-            "Ignore unchanged mapped entries")
-            .create("i"));
+//    options
+//    .addOption(OptionBuilder
+//        .withLongOpt("ignore-unchanged")
+//        .withDescription(
+//            "Ignore unchanged mapped entries")
+//            .create("i"));
     options
     .addOption(OptionBuilder
         .withLongOpt("output")
@@ -198,6 +205,12 @@ public class WikiMapper {
             .hasArg()
             .withArgName("FILENAME")
             .create("w"));
+    options
+    .addOption(OptionBuilder
+        .withLongOpt("evaluate")
+        .withDescription(
+            "Runs Mapper in evaluation mode - Stores snippet of page texts for manual verification of disambiguations")
+            .create("e"));
     options.addOption(OptionBuilder.withLongOpt("help").create('h'));
     return options;
   }
@@ -227,8 +240,8 @@ public class WikiMapper {
 
     String srcDump = cmd.getOptionValue('s');
     String tgtDump = cmd.getOptionValue('t');
-    
-    // boolean ignoreUnchanged = cmd.hasOption('i');
+
+    evaluate = cmd.hasOption('e');
 
     if(cmd.hasOption('w')) {
       String outputFile = cmd.getOptionValue('w');

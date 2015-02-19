@@ -25,8 +25,8 @@ public class ResultGenerator {
       String srcTitle = null;
       String tgtTitle = null;
 
-      String srcText = "--NA--";
-      String tgtText = "--NA--";
+      String srcText = null;
+      String tgtText = null;
 
       srcTitle = sourceData.getTitle(srcId);
 
@@ -56,7 +56,7 @@ public class ResultGenerator {
         tgtId = targetData.getDisambiguatedId(srcId, sourceData.getPageLinks(srcId));
         tgtTitle = targetData.getTitle(tgtId);
 
-        logger_.debug(srcTitle + "(" + srcId + ") disambiguates to : " + tgtTitle + "(" + tgtId + ")");
+        logger_.info(srcTitle + "(" + srcId + ") disambiguates to : " + tgtTitle + "(" + tgtId + ")");
         srcText = sourceData.getPageText(srcId);
         tgtText = targetData.getPageText(tgtId);
       } else if(!targetData.hasId(srcId)) {

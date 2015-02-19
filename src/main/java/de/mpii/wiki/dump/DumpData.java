@@ -95,6 +95,10 @@ public class DumpData {
     if (type.requiresBasicInfo()) {
       idTitleMap.put(id, title);
       titleIdMap.put(title, id);
+    }
+
+    // load page content only for evaluation purpose.
+    if(type.loadPageText()) {
       idTextMap.put(id, Utils.cleanAndCompressText(content));
     }
 

@@ -5,14 +5,16 @@ public class DumpSettings {
   
   public enum DumpType {
     
-    SOURCE(true, false), TARGET(true, true);
+    SOURCE(true, false, false), TARGET(true, true, false), SOURCE_EVAL(true, false, true), TARGET_EVAL(true, true, true);
     
     boolean extractBasicInfo;
     boolean extractAdditionalInfo;
+    boolean loadPageText;
     
-    DumpType(boolean extractBasic, boolean extractAdditional) {
+    DumpType(boolean extractBasic, boolean extractAdditional, boolean loadText) {
       extractBasicInfo = extractBasic;
       extractAdditionalInfo = extractAdditional;
+      loadPageText = loadText;
     }
     
     public boolean requiresBasicInfo() {
@@ -21,7 +23,11 @@ public class DumpSettings {
     
     public boolean requiresAdditionalInfo() {
       return extractAdditionalInfo;
-    }    
+    }
+
+    public boolean loadPageText() {
+      return loadPageText;
+    }
   }
   
   
