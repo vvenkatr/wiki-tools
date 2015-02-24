@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import javax.xml.stream.XMLEventReader;
@@ -28,6 +27,7 @@ import de.mpii.wiki.dump.DumpReader;
 import de.mpii.wiki.dump.DumpSettings.DumpType;
 import de.mpii.wiki.dump.DumpSettings.MappedType;
 import de.mpii.wiki.result.MappedResult;
+import de.mpii.wiki.result.MappedResults;
 import de.mpii.wiki.result.ResultGenerator;
 
 /**
@@ -78,9 +78,9 @@ public class WikiMapper {
    */
 
   public static Map<String, String> map(File oldDump, File newDump, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
-    List<MappedResult> results = mapImpl(oldDump, newDump);
+    MappedResults results = mapImpl(oldDump, newDump);
     Map<String, String> finalMap = new HashMap<>();
-    for(MappedResult result : results) {
+    for(MappedResult result : results.getResults()) {
       String source = result.getSourceTitle();
       String target = result.getTargetTitle();
       MappedType mapType = result.getMappingType();
@@ -94,6 +94,7 @@ public class WikiMapper {
         finalMap.put(source, target);
       }      
     }
+    results.printResultStats();
     return finalMap;
   }
 
@@ -111,6 +112,10 @@ public class WikiMapper {
    * @throws XMLStreamException if dump xml is invalid.
    */
   public static void mapToFile(File oldDump, File newDump, File output) throws IOException, XMLStreamException {
+    if(output.exists()) {
+      logger_.warn("Output file already exists : " + output.getName() + ". Re-run after deleting/moving the file");
+      System.exit(0);      
+    }
     // by default, include the unchanged entries as well.
     mapToFile(oldDump, newDump, output, true);
   }
@@ -129,19 +134,18 @@ public class WikiMapper {
    * @throws XMLStreamException if dump xml is invalid.
    */
   public static void mapToFile(File oldDump, File newDump, File output, boolean includeUnchangedEntries) throws IOException, XMLStreamException {
-    List<MappedResult> result = mapImpl(oldDump, newDump);
+    MappedResults result = mapImpl(oldDump, newDump);
     logger_.debug("Writing results to file : " + output.getName());
     try{
-      // just in case delete any old file
-      output.delete();
-      FileUtils.writeFileContent(output, result);
+      FileUtils.writeFileContent(output, result.getResults());
       logger_.debug(result.size() + " entries written to " + output.getName());
+      result.printResultStats();
     }catch(IOException ioe) {
       logger_.error("Failed to write results to file");
     }
   }
 
-  private static List<MappedResult> mapImpl(File oldDump, File newDump) throws IOException, XMLStreamException  {    
+  private static MappedResults mapImpl(File oldDump, File newDump) throws IOException, XMLStreamException  {    
 
     XMLInputFactory factory = XMLInputFactory.newInstance();
 
@@ -166,7 +170,7 @@ public class WikiMapper {
     DumpReader.read(oldDumpReader, oldDumpData);
     logger_.info("Time to scan source dump : " + (System.currentTimeMillis() - start)/1000 + " s.");
     
-    List<MappedResult> results = ResultGenerator.generate(oldDumpData, newDumpData);    
+    MappedResults results = ResultGenerator.generate(oldDumpData, newDumpData);    
     return results;
   }
 
@@ -191,12 +195,6 @@ public class WikiMapper {
             .isRequired()
             .withArgName("TARGET_DUMP")
             .create("t"));
-//    options
-//    .addOption(OptionBuilder
-//        .withLongOpt("ignore-unchanged")
-//        .withDescription(
-//            "Ignore unchanged mapped entries")
-//            .create("i"));
     options
     .addOption(OptionBuilder
         .withLongOpt("output")
@@ -247,12 +245,9 @@ public class WikiMapper {
       String outputFile = cmd.getOptionValue('w');
       mapToFile(new File(srcDump), new File(tgtDump), new File(outputFile));
     } else {
-      List<MappedResult> results = mapImpl(new File(srcDump), new File(tgtDump));
-      FileUtils.writeFileContent(null, results);          
+      MappedResults results = mapImpl(new File(srcDump), new File(tgtDump));
+      FileUtils.writeFileContent(null, results.getResults());
+      results.printResultStats();
     }
-    // done with the map - print stats
-    // ingored source redirects
-    // ignored source disambiguations
-    // final count of Page->Disambiguation entries.
   }
 }

@@ -77,7 +77,6 @@ public class DumpData {
     disambiguations = new TIntObjectHashMap<List<String>>();
     redirections = new TIntObjectHashMap<List<String>>();
 
-    // TODO: Unused for time being, need to update this map for each scenario.
     stats = new TObjectIntHashMap<HandlerType>();
     stats.put(HandlerType.EMPTY, 0);
     stats.put(HandlerType.REDIRECTS, 0);
@@ -98,7 +97,7 @@ public class DumpData {
     }
 
     // load page content only for evaluation purpose.
-    if(type.loadPageText()) {
+    if (type.loadPageText()) {
       idTextMap.put(id, Utils.cleanAndCompressText(content));
     }
 
@@ -129,13 +128,18 @@ public class DumpData {
     if (!foundAdditionalInfo) {
       // Need to extract page links for both source and target
       handlerToExecute = new EmptyHandler();
-      pageLinks.put(id, handlerToExecute.process(content));
-      // update stats
-    } else {
-      // update stats for redirects and disambiguations
+      pageLinks.put(id, handlerToExecute.process(content));      
     }
 
+    // update stat
+    updateStat(handlerToExecute.getType());
+    
     updateCounter();
+  }
+
+  private void updateStat(HandlerType type) {
+    int count = stats.get(type);
+    stats.put(type, count + 1);
   }
 
   public int size() {

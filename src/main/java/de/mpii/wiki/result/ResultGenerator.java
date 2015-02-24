@@ -1,8 +1,5 @@
 package de.mpii.wiki.result;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -13,8 +10,8 @@ public class ResultGenerator {
 
   private static Logger logger_ = LoggerFactory.getLogger(ResultGenerator.class);
 
-  public static List<MappedResult> generate(DumpData sourceData, DumpData targetData) {
-    List<MappedResult> results = new ArrayList<>();
+  public static MappedResults generate(DumpData sourceData, DumpData targetData) {
+    MappedResults results = new MappedResults();
 
     int[] srcIds = sourceData.getPageIds();
     for (int srcId : srcIds) {
