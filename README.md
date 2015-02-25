@@ -24,12 +24,13 @@ Output:
 
 ## Mapping Features
 
-There are several features to use when doing the mapping:
- * Updated Title: The title wiki page with particular id is renamed in the later version. 
- * Redirects: If a URL becomes a redirect in later versions, this is a good indicator of the new name.
- * Page features for actual comparison. A large number of possibilities is there, a good starting point are the
-   * outgoing links on pages - if the links have a high jaccard similarity this is probably a good choice. Useful when deciding a entity-become-disambiguation page where a few candidates are already given.
-
+The following are the criteria for mapping source urls to target urls:
+ * The source redirect or disambiguation page is mapped to the same url from the target dump(will be marked as SOURCE_IGNORED).
+ * If the target page is a redirect, the source url is mapped to the last wiki page in the redirection chain.
+ * If the target page is a disambiguation, outgoing links of source page are compared with outgoing links of each of the disambiguation choices. The target page with maximum similarity measure(using Jaccard) is mapped to the source url.
+ * A source entry that has been deleted in the target dump will be mapped to null.
+ * A source url, that has same id as the target page but a different target title, will be mapped to updated title.
+ * If none of the above conditions are satisfied, then the source url is unchanged in the target dump.
 
 ## Examples
 
@@ -49,7 +50,8 @@ Output:
  - UNCHANGED (__UC__)	- Source page is same as target.
  - UPDATED (__UP__)		- Source page id is same as target id but title information has been changed
  - DELETED (__DL__)		- The page entry in source dump has been removed in the target.
- 		
+ - SOURCE_IGNORED (__SI__)	- Source page is either a disambiguation or redirect page.
+
 Sample:
 	
 	... (other mappings) ...
