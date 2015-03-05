@@ -1,8 +1,8 @@
-package de.mpii.wiki.handlers;
+package de.mpii.wiki.page.handlers;
 
 
 
-public class DisambiguationHandler extends Handler {
+public class ContentDisambiguationHandler extends Handler {
 
   private static final String[] DISAMBIGUATION_TERMS = new String[] {
     "{{Disambig}}","{{Airport_disambig}}","{{Battledist}}",
@@ -15,10 +15,10 @@ public class DisambiguationHandler extends Handler {
     "{{NA_Broadcast_List}}","{{Numberdis}}","{{Schooldis}}",
     "{{Species_Latin name abbreviation disambiguation}}",
     "{{Taxonomy_disambiguation}}","{{Species_Latin_name_disambiguation}}",
-    "{{WP_disambig}}",
+    "{{WP_disambig}}", "{{given name}}", "{{surname}}",
     // old entries
-    "{{dab}}","{{disambiguation}}","{{geodab}}","geo-dis",
-    "disambig|geo","Disambig-CU", "disamb", "disambigua",
+    "{{dab}}","{{disambiguation}}","{{geodab}}","{{geo-dis}}",
+    "{{disambig|geo}}", "{{Disambig-CU}}", "{{disamb}}",
     "Category:Disambiguation pages",
     "Category:Molecular formula disambiguation pages"
   };
@@ -32,5 +32,4 @@ public class DisambiguationHandler extends Handler {
   public HandlerType getType() {
     return HandlerType.DISAMBIGUATIONS;
   }
-
 }

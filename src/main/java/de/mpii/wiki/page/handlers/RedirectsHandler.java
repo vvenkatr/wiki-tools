@@ -1,4 +1,4 @@
-package de.mpii.wiki.handlers;
+package de.mpii.wiki.page.handlers;
 
 
 

@@ -15,17 +15,14 @@ import org.slf4j.LoggerFactory;
 import de.mpii.wiki.common.Utils;
 import de.mpii.wiki.compute.Jaccard;
 import de.mpii.wiki.dump.DumpSettings.DumpType;
-import de.mpii.wiki.handlers.DisambiguationHandler;
-import de.mpii.wiki.handlers.EmptyHandler;
-import de.mpii.wiki.handlers.Handler;
-import de.mpii.wiki.handlers.Handler.HandlerType;
-import de.mpii.wiki.handlers.RedirectsHandler;
+import de.mpii.wiki.page.PageIdentifier;
+import de.mpii.wiki.page.handlers.NormalHandler;
+import de.mpii.wiki.page.handlers.Handler;
+import de.mpii.wiki.page.handlers.Handler.HandlerType;
 
 public class DumpData {
 
   private final DumpType type;
-
-  private final Handler[] handlers;
 
   /*
    * Basic information regarding a page in wiki dump
@@ -78,7 +75,7 @@ public class DumpData {
     redirections = new TIntObjectHashMap<List<String>>();
 
     stats = new TObjectIntHashMap<HandlerType>();
-    stats.put(HandlerType.EMPTY, 0);
+    stats.put(HandlerType.NORMAL, 0);
     stats.put(HandlerType.REDIRECTS, 0);
     stats.put(HandlerType.DISAMBIGUATIONS, 0);
   }
@@ -86,7 +83,6 @@ public class DumpData {
   public DumpData(DumpType dType) {
     init();
     type = dType;
-    handlers = new Handler[] { new RedirectsHandler(), new DisambiguationHandler() };
   }
 
   public void addPageEntry(int id, String title, String content) {
@@ -102,17 +98,11 @@ public class DumpData {
     }
 
     boolean foundAdditionalInfo = false;
-
     Handler handlerToExecute = null;
     List<String> lstLinks = null;
 
-    for (Handler handler : handlers) {
-      if (handler.canHandle(content)) {
-        handlerToExecute = handler;
-        foundAdditionalInfo = true;
-        break;
-      }
-    }
+    handlerToExecute = PageIdentifier.getHandler(title, content);
+    foundAdditionalInfo = handlerToExecute.getType().containsAddnInfo();
 
     // store redirections and disambiguation only for target dump
     if (type.requiresAdditionalInfo() && foundAdditionalInfo) {
@@ -127,7 +117,7 @@ public class DumpData {
     // store page links for both source and target dumps
     if (!foundAdditionalInfo) {
       // Need to extract page links for both source and target
-      handlerToExecute = new EmptyHandler();
+      handlerToExecute = new NormalHandler();
       pageLinks.put(id, handlerToExecute.process(content));      
     }
 

@@ -1,7 +1,7 @@
-package de.mpii.wiki.handlers;
+package de.mpii.wiki.page.handlers;
 
 
-public class EmptyHandler extends Handler {
+public class NormalHandler extends Handler {
 
   @Override
   public String[] getMatcherStrings() {
@@ -10,7 +10,7 @@ public class EmptyHandler extends Handler {
 
   @Override
   public HandlerType getType() {
-    return HandlerType.EMPTY;
+    return HandlerType.NORMAL;
   }
 
 }
