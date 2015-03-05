@@ -21,7 +21,7 @@ public class DumpSettings {
       return extractBasicInfo;
     }
     
-    public boolean requiresAdditionalInfo() {
+    public boolean processSpecialPage() {
       return extractAdditionalInfo;
     }
 

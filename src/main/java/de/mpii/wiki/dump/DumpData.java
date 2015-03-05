@@ -16,13 +16,12 @@ import de.mpii.wiki.common.Utils;
 import de.mpii.wiki.compute.Jaccard;
 import de.mpii.wiki.dump.DumpSettings.DumpType;
 import de.mpii.wiki.page.PageIdentifier;
-import de.mpii.wiki.page.handlers.NormalHandler;
 import de.mpii.wiki.page.handlers.Handler;
 import de.mpii.wiki.page.handlers.Handler.HandlerType;
 
 public class DumpData {
 
-  private final DumpType type;
+  private final DumpType dumpType;
 
   /*
    * Basic information regarding a page in wiki dump
@@ -82,31 +81,31 @@ public class DumpData {
 
   public DumpData(DumpType dType) {
     init();
-    type = dType;
+    dumpType = dType;
   }
 
   public void addPageEntry(int id, String title, String content) {
     // Store the basic info retrieved from the page
-    if (type.requiresBasicInfo()) {
+    if (dumpType.requiresBasicInfo()) {
       idTitleMap.put(id, title);
       titleIdMap.put(title, id);
     }
 
     // load page content only for evaluation purpose.
-    if (type.loadPageText()) {
+    if (dumpType.loadPageText()) {
       idTextMap.put(id, Utils.cleanAndCompressText(content));
     }
 
-    boolean foundAdditionalInfo = false;
+    boolean isSpecialPage = false;
     Handler handlerToExecute = null;
     List<String> lstLinks = null;
 
     handlerToExecute = PageIdentifier.getHandler(title, content);
-    foundAdditionalInfo = handlerToExecute.getType().containsAddnInfo();
+    isSpecialPage = handlerToExecute.getType().isSpecialInfoPage();
+    lstLinks = handlerToExecute.process(content);
 
     // store redirections and disambiguation only for target dump
-    if (type.requiresAdditionalInfo() && foundAdditionalInfo) {
-      lstLinks = handlerToExecute.process(content);
+    if (dumpType.processSpecialPage() && isSpecialPage) {
       if (handlerToExecute.getType().equals(HandlerType.REDIRECTS)) {
         redirections.put(id, lstLinks);
       } else if (handlerToExecute.getType().equals(HandlerType.DISAMBIGUATIONS)) {
@@ -114,11 +113,9 @@ public class DumpData {
       }
     }
 
-    // store page links for both source and target dumps
-    if (!foundAdditionalInfo) {
-      // Need to extract page links for both source and target
-      handlerToExecute = new NormalHandler();
-      pageLinks.put(id, handlerToExecute.process(content));      
+    // Need to extract page links for both source and target
+    if (!isSpecialPage) {
+      pageLinks.put(id, lstLinks);
     }
 
     // update stat

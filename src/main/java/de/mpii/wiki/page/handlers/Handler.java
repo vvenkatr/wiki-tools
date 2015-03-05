@@ -16,7 +16,7 @@ public abstract class Handler {
       containsAdditionalInfo = addnInfo;
     }
 
-    public boolean containsAddnInfo() {
+    public boolean isSpecialInfoPage() {
       return containsAdditionalInfo;
     }
   }
