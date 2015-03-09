@@ -15,10 +15,10 @@ public class ContentDisambiguationHandler extends Handler {
     "{{NA_Broadcast_List}}","{{Numberdis}}","{{Schooldis}}",
     "{{Species_Latin name abbreviation disambiguation}}",
     "{{Taxonomy_disambiguation}}","{{Species_Latin_name_disambiguation}}",
-    "{{WP_disambig}}", "{{given name}}", "{{surname}}",
+    "{{WP_disambig}}", "{{Given name}}", "{{Surname}}",
     // old entries
-    "{{dab}}","{{disambiguation}}","{{geodab}}","{{geo-dis}}",
-    "{{disambig|geo}}", "{{Disambig-CU}}", "{{disamb}}",
+    "{{Dab}}","{{Disambiguation}}","{{Geodab}}","{{Geo-dis}}",
+    "{{Disambig|geo}}", "{{Disambig-CU}}", "{{Disamb}}",
     "Category:Disambiguation pages",
     "Category:Molecular formula disambiguation pages"
   };
