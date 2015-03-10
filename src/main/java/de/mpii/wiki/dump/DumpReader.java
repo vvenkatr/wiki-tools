@@ -17,10 +17,12 @@ public class DumpReader {
   private static final String PAGE_REVISION_TAG = "revision";
   private static final String PAGE_REVISION_TEXT_TAG = "text";
 
+  private static String pageContent;
+  
   private static Logger logger_ = LoggerFactory.getLogger(DumpReader.class);
 
-  public static void read(XMLEventReader reader, DumpData data) throws XMLStreamException {
-    // basic page info
+  private static void readImpl(XMLEventReader reader, DumpData data, boolean search, String pageTitle) throws XMLStreamException {
+ // basic page info
     int pageId = -1;
     String title = null;
     String pageText = null;
@@ -68,6 +70,16 @@ public class DumpReader {
               //  || pageText == null || pageText.equals("")
               logger_.warn("Invalid Page Entry");
             } else {
+              
+              if(search) {
+                if(title != null && title.equals(pageTitle)) {
+                  System.out.println("Page Id : " + pageId + "\nPage Title : " + title +"\nContent :\n"+pageText);
+                  pageContent = pageText;
+                  return;
+                }
+                continue;
+              }
+              
               logger_.debug("Extracted page : " + title + "(id : " + pageId + ")");
               data.addPageEntry(pageId, title, pageText);
             }
@@ -82,6 +94,16 @@ public class DumpReader {
         }
       }      
     }
-//    data.resolveAdditionalInfo();
+    //    data.resolveAdditionalInfo();
+  }
+  
+  public static void read(XMLEventReader reader, DumpData data) throws XMLStreamException {
+    readImpl(reader, data, false, null);    
+  }
+
+  public static String search(XMLEventReader reader, DumpData data, String title) throws XMLStreamException {
+    pageContent = null;
+    readImpl(reader, data, true, title);
+    return pageContent;
   } 
 }
