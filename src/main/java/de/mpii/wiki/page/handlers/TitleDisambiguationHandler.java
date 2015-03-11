@@ -5,7 +5,7 @@ package de.mpii.wiki.page.handlers;
 public class TitleDisambiguationHandler extends Handler {
 
   private static final String[] DISAMBIGUATION_TERMS = new String[] {
-    "(Disambiguation)", "(Surname)"
+    "(Disambiguation)", "(Surname)", "(Given name)", "(Name)"
   };
   
   @Override
