@@ -1,5 +1,7 @@
 package de.mpii.wiki;
 
+import gnu.trove.set.TIntSet;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -156,7 +158,8 @@ public class WikiMapper {
     DumpType sourceDumpType = (evaluate)? DumpType.SOURCE_EVAL : DumpType.SOURCE;
 
     DumpData newDumpData = new DumpData(targetDumpType);
-    DumpData oldDumpData = new DumpData(sourceDumpType);
+    TIntSet targetDisambiguationIds = newDumpData.getDisambiguationIds();
+    DumpData oldDumpData = new DumpData(sourceDumpType, targetDisambiguationIds);
     
     long start = System.currentTimeMillis();
     

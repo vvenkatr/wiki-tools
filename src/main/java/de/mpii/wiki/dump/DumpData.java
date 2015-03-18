@@ -55,6 +55,9 @@ public class DumpData {
   // just to keep track of count of processed page types
   private TObjectIntMap<HandlerType> stats;
 
+  // This would be populated *only* in source dump with disambiguation ids from target dump. (To avoid storing too much unused data)
+  private TIntSet targetDisambiguationIds;
+  
   private static Logger logger_ = LoggerFactory.getLogger(DumpData.class);
 
   private void updateCounter() {
@@ -77,11 +80,18 @@ public class DumpData {
     stats.put(HandlerType.NORMAL, 0);
     stats.put(HandlerType.REDIRECTS, 0);
     stats.put(HandlerType.DISAMBIGUATIONS, 0);
+    
+    targetDisambiguationIds = new TIntHashSet();
   }
 
   public DumpData(DumpType dType) {
     init();
     dumpType = dType;
+  }
+
+  public DumpData(DumpType dType, TIntSet targetDisambiguationIds) {
+    this(dType);
+    this.targetDisambiguationIds = targetDisambiguationIds;
   }
 
   public void addPageEntry(int id, String title, String content) {
@@ -113,9 +123,11 @@ public class DumpData {
       }
     }
 
-    // Need to extract page links for both source and target
     if (!isSpecialPage) {
-      pageLinks.put(id, lstLinks);
+      // Need to extract page links for both source(only if the source id is marked as disambiguation in target) and target
+      if(isSrcIdDisambiguatedInTarget(id) || isTargetDump(dumpType)) {
+        pageLinks.put(id, lstLinks);
+      }      
     }
 
     // update stat
@@ -124,6 +136,20 @@ public class DumpData {
     updateCounter();
   }
 
+  private boolean isSrcIdDisambiguatedInTarget(int id) {
+    return isSourceDump(dumpType) && targetDisambiguationIds.contains(id);
+  }
+  
+  private boolean isSourceDump(DumpType dumpType) {
+   return  (dumpType.equals(DumpType.SOURCE) 
+           || dumpType.equals(DumpType.SOURCE_EVAL));
+  }
+  
+  private boolean isTargetDump(DumpType dumpType) {
+    return  (dumpType.equals(DumpType.TARGET) 
+            || dumpType.equals(DumpType.TARGET_EVAL));
+   }
+  
   private void updateStat(HandlerType type) {
     int count = stats.get(type);
     stats.put(type, count + 1);
@@ -224,5 +250,9 @@ public class DumpData {
     }
     if(found) return redirectId;
     return itK;
+  }
+
+  public TIntSet getDisambiguationIds() {
+    return disambiguations.keySet();
   }
 }

@@ -148,4 +148,62 @@ public class DumpReaderTest {
     // remove tmp files
     tmpDump.delete();
   }
+  
+  @Test
+  public void verifyDumpReaderSearch() throws IOException, XMLStreamException {
+    File tmpDump = File.createTempFile("wiki-dump", "xml");
+
+    // base structure - "<mediawiki><page><title></title><id><id></page></mediawiki>"
+    BufferedWriter bw = new BufferedWriter(new FileWriter(tmpDump));
+    bw.write("<mediawiki>"
+        + "<page>"
+        + "<title>Test1</title>"
+        + "<id>1</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">Information written about Test1.</text>"
+        + "</revision>"
+        + "</page>"
+        + "<page>"
+        + "<title>Test2</title>"
+        + "<id>2</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">Information written about Test2</text>"
+        + "</revision>"
+        + "</page>"
+        + "<page>"
+        + "<title>Test3</title>"
+        + "<id>3</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">#REDIRECT [[Test1]] {{R from CamelCase}}</text>"
+        + "</revision>"
+        + "</page>"
+        + "<page>"
+        + "<title>Test4</title>"
+        + "<id>4</id>"
+        + "<revision>"
+        + "<id>1234556</id>"
+        + "<text xml:space=\"preserve\">Test 4 may refer to * [[Test_4|Test-4]] * [[Some_Test|4th Test]] {{disambig}}</text>"
+        + "</revision>"
+        + "</page>"
+        + "</mediawiki>");
+    bw.close();
+    
+    XMLInputFactory factory = XMLInputFactory.newInstance();
+
+    XMLEventReader dumpReader = factory.createXMLEventReader(new FileReader(tmpDump));
+    DumpData dumpData = new DumpData(DumpType.TARGET);
+
+    String ret = DumpReader.search(dumpReader, dumpData, "Test2");
+    assertEquals("Information written about Test2", ret);
+    
+    ret = DumpReader.search(dumpReader, dumpData, "Test3");
+    assertEquals("#REDIRECT [[Test1]] {{R from CamelCase}}", ret);
+    
+    ret = DumpReader.search(dumpReader, dumpData, "Test5");
+    assertEquals(null, ret);
+  }
+  
 }
